@@ -11,9 +11,13 @@ public class ViewColorWars extends JFrame {
     private boolean isRedTurn = true;
     private boolean redHasMoved = false;
     private boolean blueHasMoved = false;
+    private int scoreR = 0, scoreB = 0;
     private final Cell[][] grid = new Cell[GRID_SIZE][GRID_SIZE];
     private JLabel turnLabel;
-
+    private JPanel scorePanel;
+    private JLabel scoreRed;
+    private JLabel scoreBlue;
+    private JLabel scoreLabel;
     private final Color backgroundColor = new Color(255, 164, 128);
     private final Color emptyColor = new Color(255, 243, 224);
     private final Color blueTeamColor = new Color(0, 188, 212);
@@ -56,6 +60,8 @@ public class ViewColorWars extends JFrame {
                         if (state == CellState.EMPTY) {
                             if ((isRedTurn && !redHasMoved) || (!isRedTurn && !blueHasMoved)) {
                                 cell.setState(isRedTurn ? CellState.RED_THREE : CellState.BLUE_THREE);
+                                turnLabel.setText("Turn: " + (isRedTurn ? "Blue" : "Red"));
+                                turnLabel.setForeground(isRedTurn ? blueTeamColor : redTeamColor);
                                 if (isRedTurn) {
                                     redHasMoved = true;
                                 } else {
@@ -68,7 +74,8 @@ public class ViewColorWars extends JFrame {
                         else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
                             CellState nextState = state.getNextState();
                             cell.setState(nextState);
-
+                            turnLabel.setText("Turn: " + (isRedTurn ? "Blue" : "Red"));
+                            turnLabel.setForeground(isRedTurn ? blueTeamColor : redTeamColor);
                             // Nếu đạt giá trị FOUR, tự động phát nổ
                             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
                                 explodeCell(r, c, nextState);
@@ -101,18 +108,18 @@ public class ViewColorWars extends JFrame {
 
 
         //Khung bên trái hiện thị điểm
-        JPanel scorePanel = new JPanel();
+         scorePanel = new JPanel();
         scorePanel.setOpaque(false);
         scorePanel.setLayout(new FlowLayout(FlowLayout.CENTER, 3, 3));
 
-        JLabel scoreRed = new JLabel("4");
+         scoreRed = new JLabel("0");
         scoreRed.setFont(new Font("Arial", Font.BOLD, 24));
         scoreRed.setForeground(redTeamColor);
 
-        JLabel scoreLabel = new JLabel(" • ");
+         scoreLabel = new JLabel(" • ");
         scoreLabel.setFont(new Font("Arial", Font.BOLD, 24));
 
-        JLabel scoreBlue = new JLabel("10");
+         scoreBlue = new JLabel("0");
         scoreBlue.setFont(new Font("Arial", Font.BOLD, 24));
         scoreBlue.setForeground(blueTeamColor);
 
@@ -184,20 +191,28 @@ public class ViewColorWars extends JFrame {
                     // Nếu ô bên cạnh cùng màu, chỉ tăng số chấm
                     else if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
                         neighbor.setState(neighborState.getNextState());
+
                     }
                     // Nếu ô bên cạnh trống, thì set thành 1 chấm
                     else if (neighborState == CellState.EMPTY) {
                         neighbor.setState(isRed ? CellState.RED_ONE : CellState.BLUE_ONE);
+
                     }
 
                     // Nếu ô bên cạnh đạt FOUR sau khi thay đổi, tiếp tục nổ
                     if (neighbor.getState() == CellState.RED_FOUR || neighbor.getState() == CellState.BLUE_FOUR) {
                         queue.add(new int[]{newRow, newCol});
+
                     }
+
                 }
+
             }
+
         }
 
+        turnLabel.setText("Turn: " + (isRedTurn ? "Blue" : "Red"));
+        turnLabel.setForeground(isRedTurn ? blueTeamColor : redTeamColor);
         // Kiểm tra kết thúc trò chơi sau khi nổ xong
         checkGameOver();
     }
@@ -266,19 +281,35 @@ public class ViewColorWars extends JFrame {
         if (onlyRed || onlyBlue) {
             String winner = onlyRed ? "Đỏ" : "Xanh";
             JOptionPane.showMessageDialog(this, "Người chơi " + winner + " thắng!", "Trò chơi kết thúc", JOptionPane.INFORMATION_MESSAGE);
+            if(onlyRed) {
+                scoreR++;
+
+            }
+            else {
+                scoreB++;
+            }
             resetGame();
         }
+
     }
     private void resetGame() {
         redHasMoved = false;
         blueHasMoved = false;
-        isRedTurn = true; // Đỏ đi trước
-
+         // Đỏ đi trước
+        updateScoreDisplay();
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
                 grid[row][col].setState(CellState.EMPTY);
             }
         }
+    }
+    private void updateScoreDisplay() {
+        scoreRed.setText(String.valueOf(scoreR));
+        scoreBlue.setText(String.valueOf(scoreB));
+        scorePanel.add(scoreRed);
+        scorePanel.add(scoreLabel);
+        scorePanel.add(scoreBlue);
+
     }
 
     // Khởi tạo với một mẫu bố trí bảng để tham khảo trực quan
