@@ -1,6 +1,9 @@
 import java.awt.*;
 import javax.swing.*;
 
+// Thêm import cho AIPlayer
+
+
 public class ViewColorWars extends JFrame {
     private static final int GRID_SIZE = 5;
     private static final int CELL_SIZE = 80;
@@ -15,6 +18,7 @@ public class ViewColorWars extends JFrame {
     private final Color blueTeamColor = new Color(0, 188, 212);
     private final Color redTeamColor = new Color(255, 82, 82);
     private GameLogic gameLogic;
+    private AIPlayer aiPlayer;
 
     public ViewColorWars() {
         setTitle("Color Wars");
@@ -104,11 +108,38 @@ public class ViewColorWars extends JFrame {
         setContentPane(mainPanel);
         setSize(PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
         setLocationRelativeTo(null);
+        setVisible(true);
+
+        // Khởi tạo AI nhưng chưa kích hoạt ngay
+        aiPlayer = new AIPlayer(gameLogic, false);
     }
 
+    public void deactivateAI() {
+        if (aiPlayer != null) {
+            aiPlayer.deactivate();
+            aiPlayer = null;
+        }
+    }
+
+    public void reinitializeAI() {
+        deactivateAI(); // Đảm bảo AI cũ được hủy
+        aiPlayer = new AIPlayer(gameLogic, false);
+        // Kích hoạt AI ngay nếu đến lượt của nó
+        if (!gameLogic.isRedTurn()) {
+            System.out.println("Kích hoạt AI cho lượt mới");
+            aiPlayer.activate();
+        }
+    }
+
+    public void activateAI() {
+        if (aiPlayer != null && !gameLogic.isRedTurn()) {
+            aiPlayer.activate();
+        }
+    }
     public void updateScoreDisplay(int scoreR, int scoreB) {
         scoreRed.setText(String.valueOf(scoreR));
         scoreBlue.setText(String.valueOf(scoreB));
+
     }
 
     public GameLogic getGameLogic() {

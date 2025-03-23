@@ -81,4 +81,10 @@ public class Cell extends JPanel {
             }
         }
     }
+
+    public Cell clone(){
+        Cell cloneCell = new Cell(row, col, emptyColor, redTeamColor, blueTeamColor);
+        cloneCell.setState(state);
+        return cloneCell;
+    }
 }

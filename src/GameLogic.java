@@ -68,29 +68,34 @@ public class GameLogic extends JPanel {
         if (state == CellState.EMPTY) {
             if ((isRedTurn && !redHasMoved) || (!isRedTurn && !blueHasMoved)) {
                 cell.setState(isRedTurn ? CellState.RED_THREE : CellState.BLUE_THREE);
-                updateTurnLabel();
                 if (isRedTurn) {
                     redHasMoved = true;
                 } else {
                     blueHasMoved = true;
                 }
                 isRedTurn = !isRedTurn;
+                updateTurnLabel();
+                checkGameOver();
             }
         } else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
             CellState nextState = state.getNextState();
             cell.setState(nextState);
-            updateTurnLabel();
+            isRedTurn = !isRedTurn;
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
                 explodeCell(row, col, nextState);
+            } else {
+                updateTurnLabel();
+                checkGameOver();
             }
-            isRedTurn = !isRedTurn;
         }
-        checkGameOver();
     }
 
     private void updateTurnLabel() {
         turnLabel.setText("Turn: " + (isRedTurn ? "Blue" : "Red"));
         turnLabel.setForeground(isRedTurn ? blueTeamColor : redTeamColor);
+        if (!isRedTurn && redHasMoved && !isGameOver()) {
+            parent.activateAI();
+        }
     }
 
     private void explodeCell(int row, int col, CellState explodingState) {
@@ -179,30 +184,32 @@ public class GameLogic extends JPanel {
             return;
         }
 
-        boolean onlyRed = true;
-        boolean onlyBlue = true;
+        int redCount = 0;
+        int blueCount = 0;
 
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
                 CellState state = grid[row][col].getState();
                 if (state.isRed()) {
-                    onlyBlue = false;
+                    redCount++;
                 } else if (state.isBlue()) {
-                    onlyRed = false;
+                    blueCount++;
                 }
             }
         }
-
-        if (onlyRed || onlyBlue) {
-            String winner = onlyRed ? "Đỏ" : "Xanh";
+        
+        if ((redCount == 0 || blueCount == 0) && (redCount + blueCount > 1)) {
+            String winner = (redCount == 0) ? "Xanh" : "Đỏ";
             JOptionPane.showMessageDialog(parent, "Người chơi " + winner + " thắng!", "Trò chơi kết thúc", JOptionPane.INFORMATION_MESSAGE);
-            if (onlyRed) {
-                scoreR++;
-            } else {
+            if (redCount == 0) {
                 scoreB++;
+            } else {
+                scoreR++;
             }
+            parent.deactivateAI();
             resetGame();
             parent.updateScoreDisplay(scoreR, scoreB);
+
         }
     }
 
@@ -217,6 +224,68 @@ public class GameLogic extends JPanel {
                 grid[row][col].setState(CellState.EMPTY);
             }
         }
+        parent.reinitializeAI();
+    }
+
+    public void makeMove(int row, int col) {
+        handleCellClick(row, col);
+    }
+
+    public boolean isRedTurn() {
+        return isRedTurn;
+    }
+
+    public void setRedTurn(boolean redTurn) {
+        isRedTurn = redTurn;
+    }
+
+    public boolean isRedHasMoved() {
+        return redHasMoved;
+    }
+
+    public void setRedHasMoved(boolean redHasMoved) {
+        this.redHasMoved = redHasMoved;
+    }
+
+    public boolean isBlueHasMoved() {
+        return blueHasMoved;
+    }
+
+    public void setBlueHasMoved(boolean blueHasMoved) {
+        this.blueHasMoved = blueHasMoved;
+    }
+
+    public Cell[][] getGrid() {
+        return grid;
+    }
+    public void setGrid(Cell[][] newGrid) {
+        for (int row = 0 ; row < GRID_SIZE; row++) {
+            for(int col = 0; col < GRID_SIZE; col++) {
+                grid[row][col].setState(newGrid[row][col].getState());
+            }
+        }
+    }
+
+    public boolean isGameOver() {
+        if (!redHasMoved || !blueHasMoved) {
+            return false;
+        }
+
+        int redCount = 0;
+        int blueCount = 0;
+
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state = grid[row][col].getState();
+                if (state.isRed()) {
+                    redCount++;
+                } else if (state.isBlue()) {
+                    blueCount++;
+                }
+            }
+        }
+        
+        return (redCount == 0 || blueCount == 0) && (redCount + blueCount > 1);
     }
 
 }
