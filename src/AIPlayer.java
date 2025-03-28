@@ -11,7 +11,7 @@ public class AIPlayer {
     private final GameLogic gameLogic;
     private final boolean isRed;
 
-    private final int SEARCH_DEPTH = 3; // Increased depth for better planning
+    private final int SEARCH_DEPTH = 4; // Increased depth for better planning
     private Timer timer;
     private final Random random = new Random();
 
@@ -21,7 +21,7 @@ public class AIPlayer {
     }
 
     public void activate() {
-        timer = new Timer(50, new ActionListener() {
+        timer = new Timer(200, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 if ((isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn())) {

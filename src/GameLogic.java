@@ -74,6 +74,7 @@ public class GameLogic extends JPanel {
                     blueHasMoved = true;
                 }
                 isRedTurn = !isRedTurn;
+                updateScoreDisplay();
                 updateTurnLabel();
                 checkGameOver();
             }
@@ -83,6 +84,7 @@ public class GameLogic extends JPanel {
             isRedTurn = !isRedTurn;
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
                 explodeCell(row, col, nextState);
+                updateScoreDisplay();
             } else {
                 updateTurnLabel();
                 checkGameOver();
@@ -287,5 +289,22 @@ public class GameLogic extends JPanel {
         
         return (redCount == 0 || blueCount == 0) && (redCount + blueCount > 1);
     }
+    private void updateScoreDisplay() {
+        int scoreR = 0, scoreB = 0;
+
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state = grid[row][col].getState();
+                if (state.isRed()) {
+                    scoreR++;
+                } else if (state.isBlue()) {
+                    scoreB++;
+                }
+            }
+        }
+        parent.updateScoreDisplay(scoreR, scoreB);
+
+    }
+
 
 }
