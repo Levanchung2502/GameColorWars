@@ -201,15 +201,14 @@ public class GameLogic extends JPanel {
         }
         
         if ((redCount == 0 || blueCount == 0) && (redCount + blueCount > 1)) {
-            String winner = (redCount == 0) ? "Xanh" : "Đỏ";
-            JOptionPane.showMessageDialog(parent, "Người chơi " + winner + " thắng!", "Trò chơi kết thúc", JOptionPane.INFORMATION_MESSAGE);
+            String winner = (redCount == 0) ? "BLUE" : "RED";
             if (redCount == 0) {
                 scoreB++;
             } else {
                 scoreR++;
             }
             parent.deactivateAI();
-            resetGame();
+            new GameOverScreen(winner, this::resetGame);
             parent.updateScoreDisplay(scoreR, scoreB);
 
         }
