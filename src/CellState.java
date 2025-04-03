@@ -13,12 +13,10 @@ public enum CellState {
         return this == RED_ONE || this == RED_TWO || this == RED_THREE || this == RED_FOUR;
     }
 
-    // Kiểm tra xem ô hiện tại có phải là của người chơi XANH không
     public boolean isBlue() {
         return this == BLUE_ONE || this == BLUE_TWO || this == BLUE_THREE || this == BLUE_FOUR;
     }
 
-    // Lấy trạng thái kế tiếp sau khi click
     public CellState getNextState() {
         switch (this) {
             case RED_ONE:

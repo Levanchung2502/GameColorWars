@@ -126,14 +126,20 @@ public class ViewColorWars extends JFrame {
         aiPlayer = new AIPlayer(gameLogic, false);
         // Kích hoạt AI ngay nếu đến lượt của nó
         if (!gameLogic.isRedTurn()) {
-            System.out.println("Kích hoạt AI cho lượt mới");
             aiPlayer.activate();
         }
     }
 
     public void activateAI() {
         if (aiPlayer != null && !gameLogic.isRedTurn()) {
-            aiPlayer.activate();
+            try {
+                aiPlayer.activate();
+            } catch (Exception e) {
+                System.err.println("Lỗi khi kích hoạt AI: " + e.getMessage());
+                e.printStackTrace();
+                // Tạo AI mới nếu xảy ra lỗi
+                reinitializeAI();
+            }
         }
     }
     public void updateScoreDisplay(int scoreR, int scoreB) {

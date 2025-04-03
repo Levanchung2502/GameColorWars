@@ -11,9 +11,16 @@ public class AIPlayer {
     private final GameLogic gameLogic;
     private final boolean isRed;
 
-    private final int SEARCH_DEPTH = 4; // Increased depth for better planning
+    private final int SEARCH_DEPTH = 3;
     private Timer timer;
     private final Random random = new Random();
+    private final long TIME_LIMIT = 2000; // Giới hạn thời gian tìm kiếm (1 giây)
+    private long startTime;
+
+    private Cell[][] simulationGrid;
+    private boolean simulationRedTurn;
+    private boolean simulationRedMoved;
+    private boolean simulationBlueMoved;
 
     public AIPlayer(GameLogic gameLogic, boolean isRed) {
         this.gameLogic = gameLogic;
@@ -29,6 +36,7 @@ public class AIPlayer {
                 }
             }
         });
+        timer.setRepeats(false);
         timer.start();
     }
 
@@ -39,13 +47,53 @@ public class AIPlayer {
     }
 
     private void makeMove() {
-        Move bestMove = findBestMove();
-        if (bestMove != null) {
-            gameLogic.makeMove(bestMove.row, bestMove.col);
+        SwingWorker<Move, Void> worker = new SwingWorker<Move, Void>() {
+            @Override
+            protected Move doInBackground() {
+                return findBestMove();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    Move bestMove = get();
+                    if (bestMove != null) {
+                        gameLogic.makeMove(bestMove.row, bestMove.col);
+                    } else {
+                        randomMove();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    randomMove();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private void randomMove() {
+        Cell[][] grid = gameLogic.getGrid();
+        List<Move> availableMoves = new ArrayList<>();
+
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = grid[row][col].getState();
+                if (state == CellState.EMPTY ||
+                        (isRed && state.isRed()) ||
+                        (!isRed && state.isBlue())) {
+                    availableMoves.add(new Move(row, col));
+                }
+            }
+        }
+
+        if (!availableMoves.isEmpty()) {
+            Move randomMove = availableMoves.get(random.nextInt(availableMoves.size()));
+            gameLogic.makeMove(randomMove.row, randomMove.col);
         }
     }
 
     private Move findBestMove() {
+        startTime = System.currentTimeMillis();
         List<Move> possibleMoves = getAllPossibleMoves();
         if (possibleMoves.isEmpty()) {
             return null;
@@ -56,42 +104,63 @@ public class AIPlayer {
             return possibleMoves.get(random.nextInt(possibleMoves.size()));
         }
 
+        // Kiểm tra nước thắng ngay lập tức
+        for (Move move : possibleMoves) {
+            prepareSimulation();
+            if (isWinningMove(move)) {
+                return move;
+            }
+
+            if (isTimeUp()) {
+                return possibleMoves.get(random.nextInt(possibleMoves.size()));
+            }
+        }
+
         Move bestMove = null;
         int bestScore = Integer.MIN_VALUE;
 
         for (Move move : possibleMoves) {
-            if (isWinningMove(move)) {
-                return move; // Return immediately if we find a winning move
+            if (isTimeUp()) {
+                // Nếu hết thời gian mà chưa tìm được nước đi tốt nhất, trả về nước đi tốt nhất hiện tại
+                // hoặc một nước đi ngẫu nhiên nếu chưa tìm được nước đi nào
+                return (bestMove != null) ? bestMove : possibleMoves.get(random.nextInt(possibleMoves.size()));
             }
-        }
 
-        Cell[][] originalGrid = cloneGrid(gameLogic.getGrid());
-        boolean originalTurn = gameLogic.isRedTurn();
-        boolean originalRedMoved = gameLogic.isRedHasMoved();
-        boolean originalBlueMoved = gameLogic.isBlueHasMoved();
-
-        for (Move move : possibleMoves) {
-            // Mô phỏng nước đi
+            prepareSimulation();
             simulateMove(move);
             int score = minimax(SEARCH_DEPTH - 1, Integer.MIN_VALUE, Integer.MAX_VALUE, false);
-
-            // Khôi phục trạng thái
-            restoreGameState(originalGrid, originalTurn, originalRedMoved, originalBlueMoved);
 
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
             }
         }
-        return bestMove;
+        return (bestMove != null) ? bestMove : possibleMoves.get(random.nextInt(possibleMoves.size()));
+    }
+
+    private boolean isTimeUp() {
+        return System.currentTimeMillis() - startTime > TIME_LIMIT;
+    }
+
+    private void prepareSimulation() {
+        // Sao chép trạng thái hiện tại của bàn cờ
+        simulationGrid = cloneGrid(gameLogic.getGrid());
+        simulationRedTurn = gameLogic.isRedTurn();
+        simulationRedMoved = gameLogic.isRedHasMoved();
+        simulationBlueMoved = gameLogic.isBlueHasMoved();
     }
 
     private void simulateMove(Move move) {
-        Cell cell = gameLogic.getGrid()[move.row][move.col];
+        Cell cell = simulationGrid[move.row][move.col];
         CellState state = cell.getState();
 
         if (state == CellState.EMPTY) {
             cell.setState(isRed ? CellState.RED_THREE : CellState.BLUE_THREE);
+            if (isRed) {
+                simulationRedMoved = true;
+            } else {
+                simulationBlueMoved = true;
+            }
         } else {
             CellState nextState = state.getNextState();
             cell.setState(nextState);
@@ -99,6 +168,7 @@ public class AIPlayer {
                 simulateExplosion(move.row, move.col, nextState);
             }
         }
+        simulationRedTurn = !simulationRedTurn;
     }
 
     private void simulateExplosion(int row, int col, CellState explodingState) {
@@ -109,7 +179,7 @@ public class AIPlayer {
             int[] cellPos = queue.poll();
             int r = cellPos[0], c = cellPos[1];
 
-            gameLogic.getGrid()[r][c].setState(CellState.EMPTY);
+            simulationGrid[r][c].setState(CellState.EMPTY);
             boolean isRed = explodingState.isRed();
             int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
@@ -117,7 +187,7 @@ public class AIPlayer {
                 int newRow = r + dir[0], newCol = c + dir[1];
 
                 if (isValidPosition(newRow, newCol)) {
-                    Cell neighbor = gameLogic.getGrid()[newRow][newCol];
+                    Cell neighbor = simulationGrid[newRow][newCol];
                     CellState neighborState = neighbor.getState();
                     int neighborDots = getDotCount(neighborState);
 
@@ -138,37 +208,37 @@ public class AIPlayer {
         }
     }
 
-    private void restoreGameState(Cell[][] originalGrid, boolean originalTurn, boolean originalRedMoved, boolean originalBlueMoved) {
-        gameLogic.setGrid(originalGrid);
-        gameLogic.setRedTurn(originalTurn);
-        gameLogic.setRedHasMoved(originalRedMoved);
-        gameLogic.setBlueHasMoved(originalBlueMoved);
-    }
-
     private int minimax(int depth, int alpha, int beta, boolean isMaximizing) {
-        if (gameLogic.isGameOver() || depth == 0) {
-            return evaluateBoard();
+        if (isSimulationGameOver() || depth == 0 || isTimeUp()) {
+            return evaluateSimulationBoard();
         }
 
-        List<Move> possibleMoves = getAllPossibleMoves();
+        List<Move> possibleMoves = getSimulationPossibleMoves();
         if (possibleMoves.isEmpty()) {
-            return evaluateBoard();
+            return evaluateSimulationBoard();
         }
 
-        Cell[][] originalGrid = cloneGrid(gameLogic.getGrid());
-        boolean originalTurn = gameLogic.isRedTurn();
-        boolean originalRedMoved = gameLogic.isRedHasMoved();
-        boolean originalBlueMoved = gameLogic.isBlueHasMoved();
+        // Lưu trạng thái hiện tại
+        Cell[][] backupGrid = cloneGrid(simulationGrid);
+        boolean backupRedTurn = simulationRedTurn;
+        boolean backupRedMoved = simulationRedMoved;
+        boolean backupBlueMoved = simulationBlueMoved;
 
         if (isMaximizing) {
             int val = Integer.MIN_VALUE;
             for (Move move : possibleMoves) {
                 simulateMove(move);
                 int childVal = minimax(depth - 1, alpha, beta, false);
-                restoreGameState(originalGrid, originalTurn, originalRedMoved, originalBlueMoved);
+
+                // Khôi phục lại trạng thái
+                simulationGrid = cloneGrid(backupGrid);
+                simulationRedTurn = backupRedTurn;
+                simulationRedMoved = backupRedMoved;
+                simulationBlueMoved = backupBlueMoved;
 
                 val = Math.max(val, childVal);
-                if(val >= beta){
+                alpha = Math.max(alpha, val);
+                if (val >= beta) {
                     return val;
                 }
             }
@@ -178,10 +248,15 @@ public class AIPlayer {
             for (Move move : possibleMoves) {
                 simulateMove(move);
                 int childVal = minimax(depth - 1, alpha, beta, true);
-                restoreGameState(originalGrid, originalTurn, originalRedMoved, originalBlueMoved);
+
+                // Khôi phục lại trạng thái
+                simulationGrid = cloneGrid(backupGrid);
+                simulationRedTurn = backupRedTurn;
+                simulationRedMoved = backupRedMoved;
+                simulationBlueMoved = backupBlueMoved;
 
                 val = Math.min(val, childVal);
-                beta = Math.min(beta, childVal);
+                beta = Math.min(beta, val);
                 if (val <= alpha) {
                     return val;
                 }
@@ -191,27 +266,194 @@ public class AIPlayer {
     }
 
     private boolean isWinningMove(Move move) {
-        Cell[][] originalGrid = gameLogic.getGrid();
-        Cell[][] cloneGrid = cloneGrid(originalGrid);
-        boolean originalTurn = gameLogic.isRedTurn();
-        boolean originalRedMoved = gameLogic.isRedHasMoved();
-        boolean originalBlueMoved = gameLogic.isBlueHasMoved();
+        // Lưu trạng thái
+        Cell[][] backupGrid = cloneGrid(simulationGrid);
+        boolean backupRedTurn = simulationRedTurn;
+        boolean backupRedMoved = simulationRedMoved;
+        boolean backupBlueMoved = simulationBlueMoved;
 
-        gameLogic.makeMove(move.row, move.col);
+        // Thực hiện nước đi
+        simulateMove(move);
 
+        // Đánh giá
         boolean isWinning = false;
-        if (isRed && countBluePieces() == 0) {
+        if (isRed && countSimulationBluePieces() == 0) {
             isWinning = true;
-        } else if (!isRed && countRedPieces() == 0) {
+        } else if (!isRed && countSimulationRedPieces() == 0) {
             isWinning = true;
         }
 
-        gameLogic.setGrid(cloneGrid);
-        gameLogic.setRedTurn(originalTurn);
-        gameLogic.setRedHasMoved(originalRedMoved);
-        gameLogic.setBlueHasMoved(originalBlueMoved);
+        // Khôi phục
+        simulationGrid = backupGrid;
+        simulationRedTurn = backupRedTurn;
+        simulationRedMoved = backupRedMoved;
+        simulationBlueMoved = backupBlueMoved;
 
         return isWinning;
+    }
+
+    private boolean isSimulationGameOver() {
+        if (!simulationRedMoved || !simulationBlueMoved) {
+            return false;
+        }
+
+        int redCount = 0;
+        int blueCount = 0;
+
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+                if (state.isRed()) {
+                    redCount++;
+                } else if (state.isBlue()) {
+                    blueCount++;
+                }
+            }
+        }
+
+        return (redCount == 0 || blueCount == 0) && (redCount + blueCount > 1);
+    }
+
+    private int countSimulationRedPieces() {
+        int count = 0;
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+                if (state.isRed()) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int countSimulationBluePieces() {
+        int count = 0;
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+                if (state.isBlue()) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private List<Move> getSimulationPossibleMoves() {
+        List<Move> moves = new ArrayList<>();
+        boolean isRedTurn = simulationRedTurn;
+
+        // For first moves, consider all positions with slight preference for strategic positions
+        if ((isRedTurn && !simulationRedMoved) || (!isRedTurn && !simulationBlueMoved)) {
+            List<Move> strategicMoves = new ArrayList<>();
+            List<Move> normalMoves = new ArrayList<>();
+
+            // Consider all empty cells, but prioritize strategic ones
+            for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+                for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                    if (simulationGrid[row][col].getState() == CellState.EMPTY) {
+                        Move move = new Move(row, col);
+
+                        // Check if this is a strategic position (near center)
+                        int center = gameLogic.GRID_SIZE / 2;
+                        int distanceToCenter = Math.abs(row - center) + Math.abs(col - center);
+
+                        if (distanceToCenter <= 2) {
+                            strategicMoves.add(move);
+                        } else {
+                            normalMoves.add(move);
+                        }
+                    }
+                }
+            }
+
+            // Combine the lists with strategic moves first
+            moves.addAll(strategicMoves);
+            moves.addAll(normalMoves);
+
+            return moves;
+        }
+
+        // For subsequent moves
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+
+                // For first move of a color, can place on any empty cell
+                if (state == CellState.EMPTY && ((isRedTurn && !simulationRedMoved)
+                        || (!isRedTurn && !simulationBlueMoved))) {
+                    moves.add(new Move(row, col));
+                }
+                // Otherwise, can only add to existing pieces of our color
+                else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
+                    // Avoid creating early explosions only in the very early game
+                    boolean isVeryEarlyGame = countSimulationPieces() < 4;
+
+                    if (isVeryEarlyGame) {
+                        if ((isRedTurn && state == CellState.RED_THREE) ||
+                                (!isRedTurn && state == CellState.BLUE_THREE)) {
+                            // Only avoid early explosions in very early game
+                            continue;
+                        }
+                    }
+
+                    moves.add(new Move(row, col));
+                }
+            }
+        }
+
+        return moves;
+    }
+
+    private int countSimulationPieces() {
+        int count = 0;
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+                if (state != CellState.EMPTY) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private int evaluateSimulationBoard() {
+        int score = 0;
+
+        // Danh gia so luong quan co, so diem quan, so luong quan
+        int myPieces = 0, oppPieces = 0;
+        int myDots = 0, oppDots = 0;
+        int myThreeDots = 0, oppThreeDots = 0;
+
+        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
+            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
+                CellState state = simulationGrid[row][col].getState();
+                if ((isRed && state.isRed()) || (!isRed && state.isBlue())) {
+                    myPieces++;
+                    int dots = getDotCount(state);
+                    myDots += dots;
+                    if (dots == 3) myThreeDots++;
+                } else if ((isRed && state.isBlue()) || (!isRed && state.isRed())) {
+                    oppPieces++;
+                    int dots = getDotCount(state);
+                    oppDots += dots;
+                    if (dots == 3) oppThreeDots++;
+                }
+            }
+        }
+
+        // Quick terminal state check
+        if (myPieces == 0) return -10000;
+        if (oppPieces == 0) return 10000;
+
+        // Simplified scoring
+        score = (myPieces - oppPieces) * 15 +
+                (myDots - oppDots) * 10 +
+                (myThreeDots - oppThreeDots) * 25;
+
+        return score;
     }
 
     private int countPieces() {
@@ -226,73 +468,6 @@ public class AIPlayer {
             }
         }
         return count;
-    }
-
-    private int countRedPieces() {
-        int count = 0;
-        Cell[][] grid = gameLogic.getGrid();
-        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
-            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
-                if (state.isRed()) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-    private int countBluePieces() {
-        int count = 0;
-        Cell[][] grid = gameLogic.getGrid();
-        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
-            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
-                if (state.isBlue()) {
-                    count++;
-                }
-            }
-        }
-        return count;
-    }
-
-
-    private int evaluateBoard() {
-            int score = 0;
-            Cell[][] grid = gameLogic.getGrid();
-
-            // Count pieces and calculate advantage
-            int myPieces = 0, oppPieces = 0;
-            int myDots = 0, oppDots = 0;
-            int myThreeDots = 0, oppThreeDots = 0;
-
-            for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
-                for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
-                    CellState state = grid[row][col].getState();
-                    if ((isRed && state.isRed()) || (!isRed && state.isBlue())) {
-                        myPieces++;
-                        int dots = getDotCount(state);
-                        myDots += dots;
-                        if (dots == 3) myThreeDots++;
-                    } else if ((isRed && state.isBlue()) || (!isRed && state.isRed())) {
-                        oppPieces++;
-                        int dots = getDotCount(state);
-                        oppDots += dots;
-                        if (dots == 3) oppThreeDots++;
-                    }
-                }
-            }
-
-            // Quick terminal state check
-            if (myPieces == 0) return -10000;
-            if (oppPieces == 0) return 10000;
-
-            // Simplified scoring
-            score = (myPieces - oppPieces) * 15 +
-                    (myDots - oppDots) * 10 +
-                    (myThreeDots - oppThreeDots) * 25;
-
-            return score;
     }
 
     private int countInfluenceArea(Cell[][] grid, int row, int col) {
@@ -346,8 +521,6 @@ public class AIPlayer {
 
         // For first moves, consider all positions with slight preference for strategic positions
         if ((isRedTurn && !gameLogic.isRedHasMoved()) || (!isRedTurn && !gameLogic.isBlueHasMoved())) {
-            System.out.println("AI đang xét nước đi đầu tiên");
-
             List<Move> strategicMoves = new ArrayList<>();
             List<Move> normalMoves = new ArrayList<>();
 
@@ -431,36 +604,12 @@ public class AIPlayer {
         }
     }
 
-    private int evaluateTerminalState() {
-        int redCells = 0, blueCells = 0;
-        Cell[][] grid = gameLogic.getGrid();
 
-        for (int row = 0; row < gameLogic.GRID_SIZE; row++) {
-            for (int col = 0; col < gameLogic.GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
-                if (state.isRed()) {
-                    redCells++;
-                } else if (state.isBlue()) {
-                    blueCells++;
-                }
-            }
-        }
-
-        if (redCells == 0) {
-            return isRed ? -100000 : 100000;
-        }
-
-        if (blueCells == 0) {
-            return isRed ? 100000 : -100000;
-        }
-
-        return 0; // Should not happen in a terminal state
-    }
+    //Danh gia vi tri o tren ban co
     private int evaluateStrategicPositions(Cell[][] grid, boolean isRed) {
         int score = 0;
         int gridSize = gameLogic.GRID_SIZE;
 
-        // Evaluate board control - corners are less important, center and middle areas more
         for (int row = 0; row < gridSize; row++) {
             for (int col = 0; col < gridSize; col++) {
                 CellState state = grid[row][col].getState();
@@ -507,6 +656,7 @@ public class AIPlayer {
         return score;
     }
 
+    //Danh gia kha nang xay ra chuoi phat no
     private int evaluateChainPotential(Cell[][] grid, int row, int col, boolean isRed) {
         int chainScore = 0;
         int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
