@@ -93,11 +93,58 @@ public class GameLogic extends JPanel {
     }
 
     private void updateTurnLabel() {
-        turnLabel.setText("Turn: " + (isRedTurn ? "Blue" : "Red"));
-        turnLabel.setForeground(isRedTurn ? blueTeamColor : redTeamColor);
-        if (!isRedTurn && redHasMoved && !isGameOver()) {
-            parent.activateAI();
+        // Cập nhật nhãn lượt chơi
+        turnLabel.setText("Turn: " + (isRedTurn ? "Red" : "Blue"));
+        turnLabel.setForeground(isRedTurn ? redTeamColor : blueTeamColor);
+        
+        // Thêm debug chi tiết
+        System.out.println("===== CẬP NHẬT LƯỢT CHƠI =====");
+        System.out.println("isRedTurn: " + isRedTurn + 
+                           ", redHasMoved: " + redHasMoved + 
+                           ", blueHasMoved: " + blueHasMoved +
+                           ", isGameOver: " + isGameOver());
+        
+        // Đếm quân hiện tại
+        int redCount = 0, blueCount = 0;
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state = grid[row][col].getState();
+                if (state.isRed()) {
+                    redCount++;
+                } else if (state.isBlue()) {
+                    blueCount++;
+                }
+            }
         }
+        System.out.println("Số quân hiện tại: Đỏ=" + redCount + ", Xanh=" + blueCount);
+        
+        // Xử lý kích hoạt AI
+        if (!isRedTurn) {
+            if (redHasMoved && !isGameOver()) {
+                System.out.println(">> Kích hoạt AI (Lượt của XANH)");
+                
+                // Sử dụng SwingUtilities.invokeLater để tránh vấn đề với thread
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            parent.activateAI();
+                        } catch (Exception e) {
+                            System.err.println("Lỗi khi kích hoạt AI: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
+                });
+            } else {
+                System.out.println(">> Không kích hoạt AI vì: " + 
+                                  (isGameOver() ? "game đã kết thúc" : 
+                                   !redHasMoved ? "người chơi đỏ chưa đánh nước đầu tiên" : "lỗi không xác định"));
+            }
+        } else {
+            System.out.println(">> Không kích hoạt AI vì đang là lượt của người chơi ĐỎ");
+        }
+        
+        System.out.println("===============================");
     }
 
     private void explodeCell(int row, int col, CellState explodingState) {
