@@ -148,7 +148,6 @@ public class ViewColorWars extends JFrame {
     }
 
     private void cleanup() {
-        System.out.println("Dọn dẹp tài nguyên...");
         stopExistingTimers();
         if (aiExecutor != null) {
             try {
@@ -156,8 +155,6 @@ public class ViewColorWars extends JFrame {
                 aiExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-            } finally {
-                System.gc(); // Dọn dẹp bộ nhớ sau khi đóng
             }
         }
         if (aiPlayer != null) {
@@ -167,20 +164,16 @@ public class ViewColorWars extends JFrame {
 
     public void deactivateAI() {
         if (aiPlayer != null) {
-            System.out.println("Tạm dừng AI");
             isAIThinking = false;
             aiPlayer.deactivate();
         }
     }
 
     public void reinitializeAI() {
-        System.out.println("Reset AI về trạng thái ban đầu");
         if (aiPlayer != null) {
             isAIThinking = false;
             aiPlayer.deactivate();
-            // Không tạo mới AI, chỉ kích hoạt lại nếu cần
             if (!gameLogic.isRedTurn()) {
-                System.out.println("Kích hoạt lại AI");
                 activateAIWithDelay();
             }
         }
@@ -190,10 +183,11 @@ public class ViewColorWars extends JFrame {
         if (!isAIThinking) {
             SwingUtilities.invokeLater(() -> {
                 try {
-                    Thread.sleep(100); // Thêm độ trễ nhỏ để tránh quá tải
+                    // Tăng độ trễ lên 1 giây
+                    Thread.sleep(1000);
                     aiPlayer.activate();
                 } catch (Exception e) {
-                    System.err.println("Lỗi khi kích hoạt AI: " + e.getMessage());
+                    e.printStackTrace();
                 }
             });
         }
@@ -201,50 +195,33 @@ public class ViewColorWars extends JFrame {
 
     public void activateAI() {
         if (aiPlayer != null && !gameLogic.isRedTurn() && !isAIThinking) {
-            System.out.println("Kích hoạt AI (từ ViewColorWars)");
-            try {
-                stopExistingTimers();
-                isAIThinking = true;
-
-                // Thêm xử lý garbage collection trước khi AI chạy
-                System.gc();
-                
-                aiExecutor.submit(() -> {
-                    try {
-                        if (!gameLogic.isRedTurn() && !gameLogic.isGameOver()) {
-                            System.out.println("AI bắt đầu đánh...");
-                            aiPlayer.activate();
-                        }
-                    } catch (OutOfMemoryError e) {
-                        System.err.println("Lỗi hết bộ nhớ trong AI: " + e.getMessage());
-                        System.gc(); // Cố gắng giải phóng bộ nhớ
-                        reinitializeAI(); // Khởi động lại AI
-                    } catch (Exception e) {
-                        System.err.println("Lỗi trong quá trình AI suy nghĩ: " + e.getMessage());
-                    } finally {
-                        isAIThinking = false;
+            stopExistingTimers();
+            isAIThinking = true;
+            
+            aiExecutor.submit(() -> {
+                try {
+                    if (!gameLogic.isRedTurn() && !gameLogic.isGameOver()) {
+                        // Thêm độ trễ 1 giây trước khi AI đánh
+                        Thread.sleep(1000);
+                        aiPlayer.activate();
                     }
-                });
+                } catch (OutOfMemoryError e) {
+                    System.gc();
+                    reinitializeAI();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    isAIThinking = false;
+                }
+            });
 
-                // Timer giám sát với thời gian dài hơn
-                watchdogTimer = new Timer(5000, e -> {
-                    if (!gameLogic.isRedTurn() && !gameLogic.isGameOver() && !isAIThinking) {
-                        System.out.println("Watchdog: AI không phản hồi, thử kích hoạt lại...");
-                        System.gc(); // Dọn dẹp bộ nhớ trước khi thử lại
-                        activateAIWithDelay();
-                    }
-                });
-                watchdogTimer.setRepeats(false);
-                watchdogTimer.start();
-
-            } catch (Exception e) {
-                System.err.println("Lỗi trong activateAI: " + e.getMessage());
-                isAIThinking = false;
-            }
-        } else {
-            String reason = aiPlayer == null ? "AI chưa được khởi tạo" : 
-                          isAIThinking ? "AI đang suy nghĩ" : "Không phải lượt của AI";
-            System.out.println("Không thể kích hoạt AI: " + reason);
+            watchdogTimer = new Timer(5000, e -> {
+                if (!gameLogic.isRedTurn() && !gameLogic.isGameOver() && !isAIThinking) {
+                    activateAIWithDelay();
+                }
+            });
+            watchdogTimer.setRepeats(false);
+            watchdogTimer.start();
         }
     }
 
