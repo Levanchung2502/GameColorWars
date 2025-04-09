@@ -16,7 +16,7 @@ public class AIPlayer {
     private final int GRID_SIZE;
     private Timer timer;
     private long startTime;
-    
+
     private byte[][] simulationGrid;
     private boolean simulationRedTurn;
     private boolean simulationRedMoved;
@@ -39,8 +39,8 @@ public class AIPlayer {
         }
         
         timer = new Timer(100, e -> {
-            if ((isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn())) {
-                makeMove();
+                if ((isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn())) {
+                    makeMove();
             }
         });
         timer.setRepeats(false);
@@ -60,7 +60,7 @@ public class AIPlayer {
                 try {
                     startTime = System.currentTimeMillis();
                     Move bestMove = findBestMove();
-                    return bestMove != null ? bestMove : getBestMoveQuick(getAllPossibleMoves());
+                    return bestMove;
                 } catch (Exception e) {
                     e.printStackTrace();
                     return null;
@@ -102,19 +102,8 @@ public class AIPlayer {
         int alpha = Integer.MIN_VALUE;
         int beta = Integer.MAX_VALUE;
 
-        // Sắp xếp sơ bộ các nước đi để tăng hiệu quả cắt tỉa
-        List<MoveScore> scoredMoves = new ArrayList<>();
-        for (Move move : possibleMoves) {
-            prepareSimulation();
-            simulateMove(move);
-            int score = evaluateSimulationQuick();
-            scoredMoves.add(new MoveScore(move, score));
-        }
-        scoredMoves.sort((a, b) -> Integer.compare(b.score, a.score));
-
         // Áp dụng minimax với alpha-beta cho tất cả nước đi
-        for (MoveScore moveScore : scoredMoves) {
-            Move move = moveScore.move;
+        for (Move move : possibleMoves) {
             prepareSimulation();
             simulateMove(move);
             int score = minimax(MAX_DEPTH - 1, alpha, beta, false);
@@ -130,27 +119,7 @@ public class AIPlayer {
             }
         }
 
-        return bestMove != null ? bestMove : scoredMoves.get(0).move;
-    }
-
-    private Move getBestMoveQuick(List<Move> moves) {
-        if (moves.isEmpty()) return null;
-        
-        Move bestMove = null;
-        int bestScore = Integer.MIN_VALUE;
-        
-        for (Move move : moves) {
-            prepareSimulation();
-            simulateMove(move);
-            int score = evaluateSimulationBoard();
-            
-            if (score > bestScore) {
-                bestScore = score;
-                bestMove = move;
-            }
-        }
-        
-        return bestMove != null ? bestMove : moves.get(0);
+        return bestMove != null ? bestMove : possibleMoves.get(0);
     }
 
     private boolean isTimeUp() {
@@ -296,17 +265,7 @@ public class AIPlayer {
         if (possibleMoves.isEmpty()) {
             return evaluateSimulationBoard();
         }
-
-        // Sắp xếp nước đi một lần duy nhất
-        List<MoveScore> scoredMoves = new ArrayList<>();
-        for (Move move : possibleMoves) {
-            int score = evaluateMove(move);
-            scoredMoves.add(new MoveScore(move, score));
-        }
-        scoredMoves.sort((a, b) -> isMaximizing ? 
-            Integer.compare(b.score, a.score) : 
-            Integer.compare(a.score, b.score));
-
+        
         // Lưu trạng thái hiện tại
         byte[][] backupGrid = new byte[GRID_SIZE][GRID_SIZE];
         for (int i = 0; i < GRID_SIZE; i++) {
@@ -318,8 +277,8 @@ public class AIPlayer {
 
         if (isMaximizing) {
             int maxEval = Integer.MIN_VALUE;
-            for (MoveScore moveScore : scoredMoves) {
-                simulateMove(moveScore.move);
+            for (Move move : possibleMoves) {
+                simulateMove(move);
                 int eval = minimax(depth - 1, alpha, beta, false);
                 
                 // Khôi phục trạng thái
@@ -339,8 +298,8 @@ public class AIPlayer {
             return maxEval;
         } else {
             int minEval = Integer.MAX_VALUE;
-            for (MoveScore moveScore : scoredMoves) {
-                simulateMove(moveScore.move);
+            for (Move move : possibleMoves) {
+                simulateMove(move);
                 int eval = minimax(depth - 1, alpha, beta, true);
                 
                 // Khôi phục trạng thái
@@ -361,157 +320,7 @@ public class AIPlayer {
         }
     }
 
-    private int evaluateMove(Move move) {
-        int score = 0;
-        
-        // Vị trí chiến lược
-        int center = GRID_SIZE / 2;
-        int distanceToCenter = Math.abs(move.row - center) + Math.abs(move.col - center);
-        score -= distanceToCenter * 10;
-        
-        // Kiểm tra khả năng tạo chuỗi nổ cho bản thân
-        if (canCreateChainForSelf(move)) {
-            score += 500;
-        }
-        
-        // Kiểm tra khả năng tấn công đối phương
-        if (canAttackOpponent(move)) {
-            score += 200;
-        }
-        
-        // Kiểm tra khả năng tấn công ô 3 chấm của đối phương
-        if (canAttackThreeDotOpponent(move)) {
-            score += 800; // Tăng điểm mạnh cho việc tấn công ô 3 chấm
-        }
-        
-        // Trừ điểm nếu nước đi có thể tạo cơ hội cho đối phương
-        if (canCreateChainForOpponent(move)) {
-            score -= 400;
-        }
-        
-        return score;
-    }
 
-    private boolean canCreateChainForSelf(Move move) {
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] dir : directions) {
-            int newRow = move.row + dir[0];
-            int newCol = move.col + dir[1];
-            if (isValidPosition(newRow, newCol)) {
-                byte neighborCode = simulationGrid[newRow][newCol];
-                if (neighborCode != 0) {
-                    CellState neighborState = convertCodeToState(neighborCode);
-                    if ((isRed && neighborState.isRed() && getDotCount(neighborState) >= 2) ||
-                        (!isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean canCreateChainForOpponent(Move move) {
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] dir : directions) {
-            int newRow = move.row + dir[0];
-            int newCol = move.col + dir[1];
-            if (isValidPosition(newRow, newCol)) {
-                byte neighborCode = simulationGrid[newRow][newCol];
-                if (neighborCode != 0) {
-                    CellState neighborState = convertCodeToState(neighborCode);
-                    if ((isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2) ||
-                        (!isRed && neighborState.isRed() && getDotCount(neighborState) >= 2)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean canAttackOpponent(Move move) {
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] dir : directions) {
-            int newRow = move.row + dir[0];
-            int newCol = move.col + dir[1];
-            if (isValidPosition(newRow, newCol)) {
-                byte neighborCode = simulationGrid[newRow][newCol];
-                if (neighborCode != 0) {
-                    CellState neighborState = convertCodeToState(neighborCode);
-                    if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private boolean canAttackThreeDotOpponent(Move move) {
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-        for (int[] dir : directions) {
-            int newRow = move.row + dir[0];
-            int newCol = move.col + dir[1];
-            if (isValidPosition(newRow, newCol)) {
-                byte neighborCode = simulationGrid[newRow][newCol];
-                if (neighborCode != 0) {
-                    CellState neighborState = convertCodeToState(neighborCode);
-                    if ((isRed && neighborState.isBlue() && getDotCount(neighborState) == 3) ||
-                        (!isRed && neighborState.isRed() && getDotCount(neighborState) == 3)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    private int evaluateSimulationQuick() {
-        int myPieces = 0, oppPieces = 0;
-        int myDots = 0, oppDots = 0;
-        int myThreeDots = 0, oppThreeDots = 0;
-        int attackThreeDotScore = 0;
-
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                byte state = simulationGrid[row][col];
-                if (state == 0) continue;
-
-                if ((isRed && state <= 4) || (!isRed && state > 4)) {
-                    myPieces++;
-                    int dots = (state <= 4 ? state : state - 4);
-                    myDots += dots;
-                    if (dots == 3) myThreeDots++;
-                } else {
-                    oppPieces++;
-                    int dots = (state <= 4 ? state : state - 4);
-                    oppDots += dots;
-                    if (dots == 3) {
-                        oppThreeDots++;
-                        // Kiểm tra xem có thể tấn công ô 3 chấm này không
-                        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-                        for (int[] dir : directions) {
-                            int newRow = row + dir[0];
-                            int newCol = col + dir[1];
-                            if (isValidPosition(newRow, newCol)) {
-                                byte neighborState = simulationGrid[newRow][newCol];
-                                if (neighborState == 0) {
-                                    attackThreeDotScore += 1000; // Tăng điểm mạnh cho khả năng tấn công ô 3 chấm
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Tính điểm tổng hợp với trọng số mới
-        return (myPieces - oppPieces) * 200 +                    // Trọng số cho số lượng quân
-               (myDots - oppDots) * 150 +                        // Trọng số cho tổng số điểm
-               (myThreeDots - oppThreeDots) * 500 +              // Tăng trọng số cho quân 3 điểm
-               attackThreeDotScore;                              // Thêm điểm cho khả năng tấn công ô 3 chấm
-    }
 
     private boolean isSimulationGameOver() {
         if (!simulationRedMoved || !simulationBlueMoved) {
@@ -572,7 +381,7 @@ public class AIPlayer {
                             if (convertCodeToState(simulationGrid[row][col]) == CellState.EMPTY) {
                                 int distance = Math.abs(row - playerRow) + Math.abs(col - playerCol);
                                 if (distance >= 3) { // Chỉ chọn các vị trí cách xa ít nhất 3 ô
-                                    moves.add(new Move(row, col));
+                    moves.add(new Move(row, col));
                                 }
                             }
                         }
@@ -604,8 +413,8 @@ public class AIPlayer {
                     }
                 }
             }
-            return moves;
-        }
+        return moves;
+    }
 
         // Xử lý các nước đi tiếp theo như bình thường
         for (int row = 0; row < GRID_SIZE; row++) {
@@ -854,13 +663,4 @@ public class AIPlayer {
         return moves;
     }
 
-    private static class MoveScore {
-        Move move;
-        int score;
-
-        MoveScore(Move move, int score) {
-            this.move = move;
-            this.score = score;
-        }
-    }
 }
