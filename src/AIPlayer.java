@@ -14,19 +14,15 @@ public class AIPlayer {
     private final GameLogic gameLogic;
     private final boolean isRed;
     private final int GRID_SIZE;
-    private final int SEARCH_DEPTH = 3;
     private Timer timer;
-    private final long TIME_LIMIT = 2000;
     private long startTime;
-
-    // Sử dụng mảng nguyên thủy thay vì đối tượng Cell để tối ưu bộ nhớ
+    
     private byte[][] simulationGrid;
     private boolean simulationRedTurn;
     private boolean simulationRedMoved;
     private boolean simulationBlueMoved;
 
     private static final int MAX_DEPTH = 3;
-    private static final int INITIAL_MOVES_LIMIT = 12;
     private int nodesExplored = 0;
     private static final int MAX_NODES = 10000;
 
@@ -292,7 +288,7 @@ public class AIPlayer {
     private int minimax(int depth, int alpha, int beta, boolean isMaximizing) {
         nodesExplored++;
         
-        if (isTimeUp() || nodesExplored > MAX_NODES || depth == 0 || isSimulationGameOver()) {
+        if (nodesExplored > MAX_NODES || depth == 0 || isSimulationGameOver()) {
             return evaluateSimulationBoard();
         }
 
@@ -301,20 +297,17 @@ public class AIPlayer {
             return evaluateSimulationBoard();
         }
 
-        // Sắp xếp nước đi để tăng hiệu quả cắt tỉa
+        // Sắp xếp nước đi một lần duy nhất
         List<MoveScore> scoredMoves = new ArrayList<>();
         for (Move move : possibleMoves) {
-            prepareSimulation();
-            simulateMove(move);
-            int score = evaluateSimulationQuick();
+            int score = evaluateMove(move);
             scoredMoves.add(new MoveScore(move, score));
-            // Khôi phục trạng thái
-            simulateUndoMove(move);
         }
         scoredMoves.sort((a, b) -> isMaximizing ? 
             Integer.compare(b.score, a.score) : 
             Integer.compare(a.score, b.score));
 
+        // Lưu trạng thái hiện tại
         byte[][] backupGrid = new byte[GRID_SIZE][GRID_SIZE];
         for (int i = 0; i < GRID_SIZE; i++) {
             System.arraycopy(simulationGrid[i], 0, backupGrid[i], 0, GRID_SIZE);
@@ -368,17 +361,117 @@ public class AIPlayer {
         }
     }
 
-    private void simulateUndoMove(Move move) {
-        // Khôi phục trạng thái trước khi thực hiện nước đi
-        if (simulationGrid[move.row][move.col] != 0) {
-            simulationGrid[move.row][move.col]--;
+    private int evaluateMove(Move move) {
+        int score = 0;
+        
+        // Vị trí chiến lược
+        int center = GRID_SIZE / 2;
+        int distanceToCenter = Math.abs(move.row - center) + Math.abs(move.col - center);
+        score -= distanceToCenter * 10;
+        
+        // Kiểm tra khả năng tạo chuỗi nổ cho bản thân
+        if (canCreateChainForSelf(move)) {
+            score += 500;
         }
-        simulationRedTurn = !simulationRedTurn;
+        
+        // Kiểm tra khả năng tấn công đối phương
+        if (canAttackOpponent(move)) {
+            score += 200;
+        }
+        
+        // Kiểm tra khả năng tấn công ô 3 chấm của đối phương
+        if (canAttackThreeDotOpponent(move)) {
+            score += 800; // Tăng điểm mạnh cho việc tấn công ô 3 chấm
+        }
+        
+        // Trừ điểm nếu nước đi có thể tạo cơ hội cho đối phương
+        if (canCreateChainForOpponent(move)) {
+            score -= 400;
+        }
+        
+        return score;
+    }
+
+    private boolean canCreateChainForSelf(Move move) {
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] dir : directions) {
+            int newRow = move.row + dir[0];
+            int newCol = move.col + dir[1];
+            if (isValidPosition(newRow, newCol)) {
+                byte neighborCode = simulationGrid[newRow][newCol];
+                if (neighborCode != 0) {
+                    CellState neighborState = convertCodeToState(neighborCode);
+                    if ((isRed && neighborState.isRed() && getDotCount(neighborState) >= 2) ||
+                        (!isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean canCreateChainForOpponent(Move move) {
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] dir : directions) {
+            int newRow = move.row + dir[0];
+            int newCol = move.col + dir[1];
+            if (isValidPosition(newRow, newCol)) {
+                byte neighborCode = simulationGrid[newRow][newCol];
+                if (neighborCode != 0) {
+                    CellState neighborState = convertCodeToState(neighborCode);
+                    if ((isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2) ||
+                        (!isRed && neighborState.isRed() && getDotCount(neighborState) >= 2)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean canAttackOpponent(Move move) {
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] dir : directions) {
+            int newRow = move.row + dir[0];
+            int newCol = move.col + dir[1];
+            if (isValidPosition(newRow, newCol)) {
+                byte neighborCode = simulationGrid[newRow][newCol];
+                if (neighborCode != 0) {
+                    CellState neighborState = convertCodeToState(neighborCode);
+                    if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean canAttackThreeDotOpponent(Move move) {
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        for (int[] dir : directions) {
+            int newRow = move.row + dir[0];
+            int newCol = move.col + dir[1];
+            if (isValidPosition(newRow, newCol)) {
+                byte neighborCode = simulationGrid[newRow][newCol];
+                if (neighborCode != 0) {
+                    CellState neighborState = convertCodeToState(neighborCode);
+                    if ((isRed && neighborState.isBlue() && getDotCount(neighborState) == 3) ||
+                        (!isRed && neighborState.isRed() && getDotCount(neighborState) == 3)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private int evaluateSimulationQuick() {
         int myPieces = 0, oppPieces = 0;
         int myDots = 0, oppDots = 0;
+        int myThreeDots = 0, oppThreeDots = 0;
+        int attackThreeDotScore = 0;
 
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
@@ -387,15 +480,37 @@ public class AIPlayer {
 
                 if ((isRed && state <= 4) || (!isRed && state > 4)) {
                     myPieces++;
-                    myDots += (state <= 4 ? state : state - 4);
+                    int dots = (state <= 4 ? state : state - 4);
+                    myDots += dots;
+                    if (dots == 3) myThreeDots++;
                 } else {
                     oppPieces++;
-                    oppDots += (state <= 4 ? state : state - 4);
+                    int dots = (state <= 4 ? state : state - 4);
+                    oppDots += dots;
+                    if (dots == 3) {
+                        oppThreeDots++;
+                        // Kiểm tra xem có thể tấn công ô 3 chấm này không
+                        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+                        for (int[] dir : directions) {
+                            int newRow = row + dir[0];
+                            int newCol = col + dir[1];
+                            if (isValidPosition(newRow, newCol)) {
+                                byte neighborState = simulationGrid[newRow][newCol];
+                                if (neighborState == 0) {
+                                    attackThreeDotScore += 1000; // Tăng điểm mạnh cho khả năng tấn công ô 3 chấm
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        return (myPieces - oppPieces) * 200 + (myDots - oppDots) * 150;
+        // Tính điểm tổng hợp với trọng số mới
+        return (myPieces - oppPieces) * 200 +                    // Trọng số cho số lượng quân
+               (myDots - oppDots) * 150 +                        // Trọng số cho tổng số điểm
+               (myThreeDots - oppThreeDots) * 500 +              // Tăng trọng số cho quân 3 điểm
+               attackThreeDotScore;                              // Thêm điểm cho khả năng tấn công ô 3 chấm
     }
 
     private boolean isSimulationGameOver() {
@@ -513,6 +628,8 @@ public class AIPlayer {
         int myDots = 0, oppDots = 0;
         int myThreeDots = 0, oppThreeDots = 0;
         int chainPotentialScore = 0;
+        int opponentChainThreat = 0;
+        int opponentThreeDotThreat = 0;
 
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
@@ -529,28 +646,36 @@ public class AIPlayer {
                     oppPieces++;
                     int dots = getDotCount(state);
                     oppDots += dots;
-                    if (dots == 3) oppThreeDots++;
+                    if (dots == 3) {
+                        oppThreeDots++;
+                        opponentThreeDotThreat += evaluateThreeDotThreat(simulationGrid, row, col, isRed);
+                    }
+                    if (dots >= 2) {
+                        opponentChainThreat += evaluateOpponentChainThreat(simulationGrid, row, col, isRed);
+                    }
                 }
             }
         }
 
         // Kiểm tra trạng thái kết thúc
-        if (myPieces == 0) return -100000; // Tránh nước đi dẫn đến thua
-        if (oppPieces == 0) return 100000; // Ưu tiên nước đi dẫn đến thắng
+        if (myPieces == 0) return -100000;
+        if (oppPieces == 0) return 100000;
 
-        // Tính điểm tổng hợp - tăng trọng số cho chuỗi nổ
+        // Tính điểm tổng hợp với trọng số mới
         score = (myPieces - oppPieces) * 200 +                    // Trọng số cho số lượng quân
                 (myDots - oppDots) * 150 +                        // Trọng số cho tổng số điểm
                 (myThreeDots - oppThreeDots) * 300 +              // Trọng số cho quân 3 điểm
-                chainPotentialScore * 250;                        // Tăng trọng số cho khả năng tạo chuỗi nổ
+                chainPotentialScore * 400 -                       // Tăng trọng số cho khả năng tạo chuỗi nổ
+                opponentChainThreat * 350 -                       // Trừ điểm cho mối đe dọa từ đối phương
+                opponentThreeDotThreat * 500;                     // Trừ điểm mạnh cho mối đe dọa từ quân 3 điểm đối phương
 
         // Thêm điểm thưởng cho các tình huống đặc biệt
         if (myPieces > oppPieces) {
-            score += 400;
+            score += 500;
         }
         
         if (myThreeDots > oppThreeDots) {
-            score += 600;
+            score += 700;
         }
 
         return score;
@@ -580,6 +705,46 @@ public class AIPlayer {
         return chainScore;
     }
 
+    private int evaluateOpponentChainThreat(byte[][] grid, int row, int col, boolean isRed) {
+        int threatScore = 0;
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+
+        for (int[] dir : directions) {
+            int newRow = row + dir[0];
+            int newCol = col + dir[1];
+
+            if (isValidPosition(newRow, newCol)) {
+                CellState neighborState = convertCodeToState(grid[newRow][newCol]);
+                // Tăng điểm cho mối đe dọa từ đối phương
+                if ((isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2) ||
+                    (!isRed && neighborState.isRed() && getDotCount(neighborState) >= 2)) {
+                    threatScore += 50;
+                }
+            }
+        }
+        return threatScore;
+    }
+
+    private int evaluateThreeDotThreat(byte[][] grid, int row, int col, boolean isRed) {
+        int threatScore = 0;
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+
+        for (int[] dir : directions) {
+            int newRow = row + dir[0];
+            int newCol = col + dir[1];
+
+            if (isValidPosition(newRow, newCol)) {
+                CellState neighborState = convertCodeToState(grid[newRow][newCol]);
+                // Tăng điểm cho mối đe dọa từ quân 3 điểm đối phương
+                if ((isRed && neighborState.isBlue() && getDotCount(neighborState) == 3) ||
+                    (!isRed && neighborState.isRed() && getDotCount(neighborState) == 3)) {
+                    threatScore += 100; // Tăng điểm mạnh cho mối đe dọa từ quân 3 điểm
+                }
+            }
+        }
+        return threatScore;
+    }
+
     private int countPieces() {
         int count = 0;
         Cell[][] grid = gameLogic.getGrid();
@@ -591,21 +756,6 @@ public class AIPlayer {
                 }
             }
         }
-        return count;
-    }
-
-    private int countInfluenceArea(byte[][] grid, int row, int col) {
-        int count = 0;
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-
-        for (int[] dir : directions) {
-            int newRow = row + dir[0];
-            int newCol = col + dir[1];
-            if (isValidPosition(newRow, newCol)) {
-                count++;
-            }
-        }
-
         return count;
     }
 
@@ -634,21 +784,6 @@ public class AIPlayer {
 
     private boolean isOppositeColor(CellState s1, CellState s2) {
         return (s1.isRed() && s2.isBlue()) || (s1.isBlue() && s2.isRed());
-    }
-
-    private CellState getStateByDotCount(int dotCount, boolean isRed) {
-        switch (dotCount) {
-            case 1:
-                return isRed ? CellState.RED_ONE : CellState.BLUE_ONE;
-            case 2:
-                return isRed ? CellState.RED_TWO : CellState.BLUE_TWO;
-            case 3:
-                return isRed ? CellState.RED_THREE : CellState.BLUE_THREE;
-            case 4:
-                return isRed ? CellState.RED_FOUR : CellState.BLUE_FOUR;
-            default:
-                return CellState.EMPTY;
-        }
     }
 
     // Phương thức để kiểm tra xem AI có đang hoạt động hay không
