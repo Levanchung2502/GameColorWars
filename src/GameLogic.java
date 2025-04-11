@@ -102,14 +102,14 @@ public class GameLogic extends JPanel {
         // Cập nhật nhãn lượt chơi
         turnLabel.setText("Turn: " + (isRedTurn ? "Red" : "Blue"));
         turnLabel.setForeground(isRedTurn ? redTeamColor : blueTeamColor);
-        
+
         // Thêm debug chi tiết
         System.out.println("===== CẬP NHẬT LƯỢT CHƠI =====");
-        System.out.println("isRedTurn: " + isRedTurn + 
-                           ", redHasMoved: " + redHasMoved + 
+        System.out.println("isRedTurn: " + isRedTurn +
+                           ", redHasMoved: " + redHasMoved +
                            ", blueHasMoved: " + blueHasMoved +
                            ", isGameOver: " + isGameOver());
-        
+
         // Đếm quân hiện tại
         int redCount = 0, blueCount = 0;
         for (int row = 0; row < GRID_SIZE; row++) {
@@ -123,12 +123,12 @@ public class GameLogic extends JPanel {
             }
         }
         System.out.println("Số quân hiện tại: Đỏ=" + redCount + ", Xanh=" + blueCount);
-        
+
         // Xử lý kích hoạt AI
         if (!isRedTurn) {
             if (redHasMoved && !isGameOver()) {
                 System.out.println(">> Kích hoạt AI (Lượt của XANH)");
-                
+
                 // Sử dụng SwingUtilities.invokeLater để tránh vấn đề với thread
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
@@ -142,14 +142,14 @@ public class GameLogic extends JPanel {
                     }
                 });
             } else {
-                System.out.println(">> Không kích hoạt AI vì: " + 
-                                  (isGameOver() ? "game đã kết thúc" : 
+                System.out.println(">> Không kích hoạt AI vì: " +
+                                  (isGameOver() ? "game đã kết thúc" :
                                    !redHasMoved ? "người chơi đỏ chưa đánh nước đầu tiên" : "lỗi không xác định"));
             }
         } else {
             System.out.println(">> Không kích hoạt AI vì đang là lượt của người chơi ĐỎ");
         }
-        
+
         System.out.println("===============================");
     }
 
@@ -289,7 +289,7 @@ public class GameLogic extends JPanel {
                 }
             }
         }
-        
+
         if ((redCount == 0 || blueCount == 0) && (redCount + blueCount > 1)) {
             String winner = (redCount == 0) ? "BLUE" : "RED";
             if (redCount == 0) {
@@ -298,9 +298,8 @@ public class GameLogic extends JPanel {
                 scoreR++;
             }
             parent.deactivateAI();
-            new GameOverScreen(winner, this::resetGame);
+            parent.showGameOver(winner);
             parent.updateScoreDisplay(scoreR, scoreB);
-
         }
     }
 

@@ -28,6 +28,8 @@ public class ViewColorWars extends JFrame {
     private Timer watchdogTimer;
     private ExecutorService aiExecutor;
     private boolean isAIThinking = false;
+    private GameOverScreen gameOverScreen;
+    private JLayeredPane layeredPane;
 
     static {
         // Tăng kích thước heap cho JVM
@@ -44,10 +46,14 @@ public class ViewColorWars extends JFrame {
         // Khởi tạo thread pool riêng cho AI với cấu hình tối ưu
         aiExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread thread = new Thread(r);
-            thread.setPriority(Thread.MIN_PRIORITY); // Giảm độ ưu tiên xuống mức thấp nhất
-            thread.setDaemon(true); // Đặt là daemon thread
+            thread.setPriority(Thread.MIN_PRIORITY);
+            thread.setDaemon(true);
             return thread;
         });
+
+        // Tạo layeredPane để quản lý các lớp
+        layeredPane = new JLayeredPane();
+        setContentPane(layeredPane);
 
         JPanel mainPanel = new JPanel() {
             @Override
@@ -129,8 +135,20 @@ public class ViewColorWars extends JFrame {
         );
         mainPanel.add(gameLogic);
 
-        setContentPane(mainPanel);
-        setSize(PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
+        // Thêm mainPanel vào layeredPane ở lớp mặc định
+        mainPanel.setBounds(0, 0, PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), 
+                           PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
+        layeredPane.add(mainPanel, JLayeredPane.DEFAULT_LAYER);
+
+        // Khởi tạo gameOverScreen
+        gameOverScreen = new GameOverScreen("", () -> resetGame());
+        gameOverScreen.setBounds(0, 0, PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15),
+                                PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
+        gameOverScreen.setVisible(false);
+        layeredPane.add(gameOverScreen, JLayeredPane.POPUP_LAYER);
+
+        setSize(PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), 
+                PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
         setLocationRelativeTo(null);
         
         // Khởi tạo AI một lần duy nhất khi tạo game
@@ -250,5 +268,39 @@ public class ViewColorWars extends JFrame {
 
     public GameLogic getGameLogic() {
         return gameLogic;
+    }
+
+    public void showGameOver(String winner) {
+        // Xóa gameOverScreen cũ khỏi layeredPane nếu có
+        if (gameOverScreen != null) {
+            gameOverScreen.setVisible(false);
+            layeredPane.remove(gameOverScreen);
+        }
+        
+        // Tạo và thêm gameOverScreen mới
+        gameOverScreen = new GameOverScreen(winner, () -> resetGame());
+        gameOverScreen.setBounds(0, 0, PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15),
+                                PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
+        layeredPane.add(gameOverScreen, JLayeredPane.POPUP_LAYER);
+        
+        // Hiển thị gameOverScreen và cập nhật giao diện
+        gameOverScreen.setVisible(true);
+        layeredPane.revalidate();
+        layeredPane.repaint();
+    }
+
+    public void hideGameOver() {
+        if (gameOverScreen != null) {
+            gameOverScreen.setVisible(false);
+            layeredPane.remove(gameOverScreen);
+            layeredPane.revalidate();
+            layeredPane.repaint();
+        }
+    }
+
+    private void resetGame() {
+        hideGameOver();
+        gameLogic.resetGame();
+        repaint();
     }
 }
