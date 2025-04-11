@@ -4,7 +4,8 @@ import java.awt.event.MouseEvent;
 import java.util.LinkedList;
 import java.util.Queue;
 import javax.swing.*;
-
+import java.util.List;
+import java.util.ArrayList;
 public class GameLogic extends JPanel {
     public static final int GRID_SIZE = 5;
     private static final int CELL_SIZE = 80;
@@ -83,8 +84,13 @@ public class GameLogic extends JPanel {
             cell.setState(nextState);
             isRedTurn = !isRedTurn;
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
-                explodeCell(row, col, nextState);
-                updateScoreDisplay();
+                explodeCell(row, col, nextState, () -> {
+                    // Sau khi explode xong mới cập nhật giao diện và đổi lượt
+                    SwingUtilities.invokeLater(() -> {
+
+                        updateScoreDisplay();
+                    });
+                });
             } else {
                 updateTurnLabel();
                 checkGameOver();
@@ -147,45 +153,82 @@ public class GameLogic extends JPanel {
         System.out.println("===============================");
     }
 
-    private void explodeCell(int row, int col, CellState explodingState) {
-        Queue<int[]> queue = new LinkedList<>();
-        queue.add(new int[]{row, col});
+    private void explodeCell(int row, int col, CellState explodingState, Runnable onFinish) {
+        new Thread(() -> {
+            Queue<int[]> queue = new LinkedList<>();
+            queue.add(new int[]{row, col});
 
-        while (!queue.isEmpty()) {
-            int[] cellPos = queue.poll();
-            int r = cellPos[0], c = cellPos[1];
+            while (!queue.isEmpty()) {
+                List<int[]> nextExplosions = new ArrayList<>();
 
-            grid[r][c].setState(CellState.EMPTY);
-            boolean isRed = explodingState.isRed();
-            int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+                int size = queue.size(); // xử lý theo "từng lớp" của nổ
+                for (int i = 0; i < size; i++) {
+                    int[] cellPos = queue.poll();
+                    int r = cellPos[0], c = cellPos[1];
 
-            for (int[] dir : directions) {
-                int newRow = r + dir[0], newCol = c + dir[1];
+                    // Xóa ô hiện tại
+                    grid[r][c].setState(CellState.EMPTY);
 
-                if (isValidPosition(newRow, newCol)) {
-                    Cell neighbor = grid[newRow][newCol];
-                    CellState neighborState = neighbor.getState();
-                    int neighborDots = getDotCount(neighborState);
+                    boolean isRed = explodingState.isRed();
+                    int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
 
-                    if (isOppositeColor(explodingState, neighborState)) {
-                        neighborDots += 1;
-                        neighbor.setState(isRed ? getStateByDotCount(neighborDots, true) : getStateByDotCount(neighborDots, false));
-                    } else if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
-                        neighbor.setState(neighborState.getNextState());
-                    } else if (neighborState == CellState.EMPTY) {
-                        neighbor.setState(isRed ? CellState.RED_ONE : CellState.BLUE_ONE);
+                    List<int[]> toBeUpdated = new ArrayList<>();
+
+                    // ✅ Gom tất cả ô xung quanh trước, sau đó cập nhật đồng thời
+                    for (int[] dir : directions) {
+                        int newRow = r + dir[0], newCol = c + dir[1];
+
+                        if (isValidPosition(newRow, newCol)) {
+                            toBeUpdated.add(new int[]{newRow, newCol});
+                        }
                     }
 
-                    if (neighbor.getState() == CellState.RED_FOUR || neighbor.getState() == CellState.BLUE_FOUR) {
-                        queue.add(new int[]{newRow, newCol});
+                    // ✅ Cập nhật đồng thời các ô
+                    for (int[] pos : toBeUpdated) {
+                        int newRow = pos[0], newCol = pos[1];
+                        Cell neighbor = grid[newRow][newCol];
+                        CellState neighborState = neighbor.getState();
+                        int neighborDots = getDotCount(neighborState);
+
+                        if (isOppositeColor(explodingState, neighborState)) {
+                            neighborDots += 1;
+                            neighbor.setState(isRed ? getStateByDotCount(neighborDots, true) : getStateByDotCount(neighborDots, false));
+                        } else if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
+                            neighbor.setState(neighborState.getNextState());
+                        } else if (neighborState == CellState.EMPTY) {
+                            neighbor.setState(isRed ? CellState.RED_ONE : CellState.BLUE_ONE);
+                        }
+
+                        if (neighbor.getState() == CellState.RED_FOUR || neighbor.getState() == CellState.BLUE_FOUR) {
+                            nextExplosions.add(new int[]{newRow, newCol});
+                        }
                     }
                 }
+
+                // ✅ Delay trước khi thực hiện nổ tiếp
+                sleep(800);
+
+                // Thêm tất cả ô chuẩn bị nổ tiếp vào queue
+                queue.addAll(nextExplosions);
             }
-        }
-        updateTurnLabel();
-        checkGameOver();
+
+            // ✅ Khi xong hết mới chạy onFinish
+            SwingUtilities.invokeLater(() -> {
+                updateTurnLabel();
+                checkGameOver();
+                onFinish.run();
+            });
+        }).start();
     }
 
+
+    private void sleep(int millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
     private boolean isValidPosition(int row, int col) {
         return row >= 0 && row < grid.length && col >= 0 && col < grid[0].length;
     }
