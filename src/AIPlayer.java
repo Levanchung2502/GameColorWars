@@ -22,7 +22,7 @@ public class AIPlayer {
     private boolean simulationRedMoved;
     private boolean simulationBlueMoved;
 
-    private static final int MAX_DEPTH = 3;
+    private static final int MAX_DEPTH = 4;
     private int nodesExplored = 0;
     private static final int MAX_NODES = 10000;
 
@@ -319,8 +319,6 @@ public class AIPlayer {
             return minEval;
         }
     }
-
-
 
     private boolean isSimulationGameOver() {
         if (!simulationRedMoved || !simulationBlueMoved) {
