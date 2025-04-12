@@ -6,6 +6,9 @@ public class ViewMenuGame extends JFrame {
     private final JPanel mainPanel;
     private ViewColorWars gamePanel;
 
+    private static final int WINDOW_WIDTH = 2 * 20 + 5 * (80 + 15);  // 2*PADDING + GRID_SIZE*(CELL_SIZE + 15)
+    private static final int WINDOW_HEIGHT = 2 * 20 + 5 * (80 + 15) + 70;  // 2*PADDING + GRID_SIZE*(CELL_SIZE + 15) + 70
+
     // Đồng bộ với GameOverScreen
     private final Color backgroundColor = new Color(255, 164, 128);
     private final Color buttonHoverColor = new Color(255, 140, 100);
@@ -14,7 +17,7 @@ public class ViewMenuGame extends JFrame {
 
     public ViewMenuGame() {
         setTitle("Color Wars");
-        setSize(515, 585);
+        setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setResizable(false);
@@ -115,7 +118,7 @@ public class ViewMenuGame extends JFrame {
     // Chuyển về menu
     public void showMenu() {
         cardLayout.show(mainPanel, "menu");
-        setSize(515, 585);
+        setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
         setLocationRelativeTo(null);
     }
 }

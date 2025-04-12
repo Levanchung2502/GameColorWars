@@ -8,9 +8,11 @@ public class GameOverScreen extends JPanel {
     private final Color buttonColor = new Color(255, 200, 170);
     private final Color textColor = new Color(80, 40, 0);
     private final Runnable restartGameCallback;
+    private final ViewMenuGame parentFrame;
 
-    public GameOverScreen(String winner, Runnable restartGameCallback) {
+    public GameOverScreen(String winner, Runnable restartGameCallback, ViewMenuGame parent) {
         this.restartGameCallback = restartGameCallback;
+        this.parentFrame = parent;
         setLayout(new BorderLayout(0, 30));  // Thêm khoảng cách giữa các thành phần
         setBackground(backgroundColor);
         setBorder(new EmptyBorder(50, 0, 50, 0));  // Thêm padding cho panel
@@ -49,7 +51,7 @@ public class GameOverScreen extends JPanel {
 
         // Tạo nút "EXIT"
         JButton exitButton = createStyledButton("THOÁT");
-        exitButton.addActionListener(e -> System.exit(0));
+        exitButton.addActionListener(e -> parentFrame.showMenu());
 
         // Thêm các nút vào panel
         buttonPanel.add(Box.createVerticalGlue());

@@ -142,7 +142,7 @@ public class ViewColorWars extends JPanel {
         layeredPane.add(mainPanel, JLayeredPane.DEFAULT_LAYER);
 
         // Khởi tạo gameOverScreen
-        gameOverScreen = new GameOverScreen("", () -> resetGame());
+        gameOverScreen = new GameOverScreen("", () -> resetGame(), parentFrame);
         gameOverScreen.setBounds(0, 0, PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15),
                                 PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
         gameOverScreen.setVisible(false);
@@ -270,7 +270,7 @@ public class ViewColorWars extends JPanel {
         }
         
         // Tạo và thêm gameOverScreen mới
-        gameOverScreen = new GameOverScreen(winner, () -> resetGame());
+        gameOverScreen = new GameOverScreen(winner, () -> resetGame(), parentFrame);
         gameOverScreen.setBounds(0, 0, PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15),
                                 PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
         layeredPane.add(gameOverScreen, JLayeredPane.POPUP_LAYER);
