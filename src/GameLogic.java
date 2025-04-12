@@ -75,6 +75,7 @@ public class GameLogic extends JPanel {
                     blueHasMoved = true;
                 }
                 isRedTurn = !isRedTurn;
+                SoundManager.playScore();
                 updateScoreDisplay();
                 updateTurnLabel();
                 checkGameOver();
@@ -84,14 +85,15 @@ public class GameLogic extends JPanel {
             cell.setState(nextState);
             isRedTurn = !isRedTurn;
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
+                SoundManager.playExplosion();
                 explodeCell(row, col, nextState, () -> {
                     // Sau khi explode xong mới cập nhật giao diện và đổi lượt
                     SwingUtilities.invokeLater(() -> {
-
                         updateScoreDisplay();
                     });
                 });
             } else {
+                SoundManager.playScore();
                 updateTurnLabel();
                 checkGameOver();
             }
@@ -150,7 +152,6 @@ public class GameLogic extends JPanel {
                     int[] cellPos = queue.poll();
                     int r = cellPos[0], c = cellPos[1];
 
-                    // Xóa ô hiện tại
                     grid[r][c].setState(CellState.EMPTY);
 
                     boolean isRed = explodingState.isRed();
@@ -158,7 +159,6 @@ public class GameLogic extends JPanel {
 
                     List<int[]> toBeUpdated = new ArrayList<>();
 
-                    // ✅ Gom tất cả ô xung quanh trước, sau đó cập nhật đồng thời
                     for (int[] dir : directions) {
                         int newRow = r + dir[0], newCol = c + dir[1];
 
@@ -167,13 +167,13 @@ public class GameLogic extends JPanel {
                         }
                     }
 
-                    // ✅ Cập nhật đồng thời các ô
                     for (int[] pos : toBeUpdated) {
                         int newRow = pos[0], newCol = pos[1];
                         Cell neighbor = grid[newRow][newCol];
                         CellState neighborState = neighbor.getState();
                         int neighborDots = getDotCount(neighborState);
 
+                        CellState oldState = neighborState;
                         if (isOppositeColor(explodingState, neighborState)) {
                             neighborDots += 1;
                             neighbor.setState(isRed ? getStateByDotCount(neighborDots, true) : getStateByDotCount(neighborDots, false));
@@ -183,20 +183,18 @@ public class GameLogic extends JPanel {
                             neighbor.setState(isRed ? CellState.RED_ONE : CellState.BLUE_ONE);
                         }
 
+
                         if (neighbor.getState() == CellState.RED_FOUR || neighbor.getState() == CellState.BLUE_FOUR) {
                             nextExplosions.add(new int[]{newRow, newCol});
                         }
                     }
                 }
 
-                // ✅ Delay trước khi thực hiện nổ tiếp
                 sleep(800);
 
-                // Thêm tất cả ô chuẩn bị nổ tiếp vào queue
                 queue.addAll(nextExplosions);
             }
 
-            // ✅ Khi xong hết mới chạy onFinish
             SwingUtilities.invokeLater(() -> {
                 updateTurnLabel();
                 checkGameOver();
@@ -204,7 +202,6 @@ public class GameLogic extends JPanel {
             });
         }).start();
     }
-
 
     private void sleep(int millis) {
         try {

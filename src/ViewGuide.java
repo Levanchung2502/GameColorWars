@@ -19,7 +19,7 @@ public class ViewGuide extends JPanel {
         title.setBorder(BorderFactory.createEmptyBorder(20, 10, 0, 10));
         add(title, BorderLayout.NORTH);
 
-        // Nội dung hướng dẫn
+
         String instructions = """
                  Mục tiêu:
                 Chiếm lĩnh ô bằng màu sắc để chiếm nhiều vùng nhất.
@@ -35,11 +35,11 @@ public class ViewGuide extends JPanel {
         textArea.setForeground(textColor);
         textArea.setBackground(backgroundColor);
         textArea.setEditable(false);
-        textArea.setFocusable(false); // ❌ Không cho focus
+        textArea.setFocusable(false); //
         textArea.setWrapStyleWord(true);
         textArea.setLineWrap(true);
         textArea.setMargin(new Insets(20, 20, 20, 20));
-        textArea.setBorder(null); // ❌ Không khung viền
+        textArea.setBorder(null); //
 
 
         JScrollPane scrollPane = new JScrollPane(textArea);
