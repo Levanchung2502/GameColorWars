@@ -1,9 +1,10 @@
-import javax.swing.*;
 import java.awt.*;
+import javax.swing.*;
 
 public class ViewMenuGame extends JFrame {
     private final CardLayout cardLayout;
     private final JPanel mainPanel;
+    private ViewColorWars gamePanel;
 
     // Đồng bộ với GameOverScreen
     private final Color backgroundColor = new Color(255, 164, 128);
@@ -16,13 +17,14 @@ public class ViewMenuGame extends JFrame {
         setSize(515, 585);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
+        setResizable(false);
 
         cardLayout = new CardLayout();
         mainPanel = new JPanel(cardLayout);
 
-        // Thêm 2 view vào mainPanel
+        // Thêm các view vào mainPanel
         mainPanel.add(createMenuPanel(), "menu");
-        mainPanel.add(new ViewGuide(this), "guide"); // ViewGuide là lớp bạn đã định nghĩa
+        mainPanel.add(new ViewGuide(this), "guide");
 
         add(mainPanel);
         setVisible(true);
@@ -32,7 +34,7 @@ public class ViewMenuGame extends JFrame {
     private JPanel createMenuPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(backgroundColor); // đồng bộ màu nền
+        panel.setBackground(backgroundColor);
 
         JLabel title = new JLabel("COLOR WARS");
         title.setFont(new Font("Segoe UI", Font.BOLD, 48));
@@ -43,12 +45,13 @@ public class ViewMenuGame extends JFrame {
         JButton botBtn = createStyledButton("Chơi với Máy");
         JButton guideBtn = createStyledButton("Hướng dẫn");
 
-        // Căn giữa các button
         friendBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
         botBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
         guideBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Sự kiện chuyển sang giao diện hướng dẫn
+        // Sự kiện cho các nút
+        friendBtn.addActionListener(e -> startGame(false));
+        botBtn.addActionListener(e -> startGame(true));
         guideBtn.addActionListener(e -> cardLayout.show(mainPanel, "guide"));
 
         panel.add(Box.createVerticalStrut(50));
@@ -61,6 +64,17 @@ public class ViewMenuGame extends JFrame {
         panel.add(guideBtn);
 
         return panel;
+    }
+
+    private void startGame(boolean isPlayWithBot) {
+        if (gamePanel != null) {
+            mainPanel.remove(gamePanel);
+        }
+        gamePanel = new ViewColorWars(this, isPlayWithBot);
+        mainPanel.add(gamePanel, "game");
+        cardLayout.show(mainPanel, "game");
+        pack();
+        setLocationRelativeTo(null);
     }
 
     private JButton createStyledButton(String text) {
@@ -101,10 +115,7 @@ public class ViewMenuGame extends JFrame {
     // Chuyển về menu
     public void showMenu() {
         cardLayout.show(mainPanel, "menu");
-    }
-
-    // Main
-    public static void main(String[] args) {
-        new ViewMenuGame();
+        setSize(515, 585);
+        setLocationRelativeTo(null);
     }
 }

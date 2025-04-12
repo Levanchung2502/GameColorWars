@@ -48,7 +48,7 @@ public class ViewGuide extends JPanel {
         add(scrollPane, BorderLayout.CENTER);
 
         // Nút BACK
-        JButton backButton = createStyledButton("BACK");
+        JButton backButton = createStyledButton("QUAY LẠI");
         backButton.addActionListener(e -> parent.showMenu());
 
         // Panel chứa nút BACK ở dưới, căn giữa

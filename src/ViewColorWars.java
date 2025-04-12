@@ -1,7 +1,5 @@
 import java.awt.*;
 import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.swing.*;
@@ -9,7 +7,7 @@ import javax.swing.*;
 // Thêm import cho AIPlayer
 
 
-public class ViewColorWars extends JFrame {
+public class ViewColorWars extends JPanel {
     private static final int GRID_SIZE = 5;
     private static final int CELL_SIZE = 80;
     private static final int PADDING = 20;
@@ -30,6 +28,7 @@ public class ViewColorWars extends JFrame {
     private boolean isAIThinking = false;
     private GameOverScreen gameOverScreen;
     private JLayeredPane layeredPane;
+    private ViewMenuGame parentFrame;
 
     static {
         // Tăng kích thước heap cho JVM
@@ -38,10 +37,9 @@ public class ViewColorWars extends JFrame {
         System.setProperty("sun.java2d.opengl", "true");
     }
 
-    public ViewColorWars() {
-        setTitle("Color Wars");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setResizable(false);
+    public ViewColorWars(ViewMenuGame parent, boolean isPlayWithBot) {
+        this.parentFrame = parent;
+        setLayout(new BorderLayout());
 
         // Khởi tạo thread pool riêng cho AI với cấu hình tối ưu
         aiExecutor = Executors.newSingleThreadExecutor(r -> {
@@ -53,7 +51,7 @@ public class ViewColorWars extends JFrame {
 
         // Tạo layeredPane để quản lý các lớp
         layeredPane = new JLayeredPane();
-        setContentPane(layeredPane);
+        add(layeredPane, BorderLayout.CENTER);
 
         JPanel mainPanel = new JPanel() {
             @Override
@@ -100,18 +98,21 @@ public class ViewColorWars extends JFrame {
         scorePanel.add(scoreBlue);
 
         // Nhãn lượt chơi
-        turnLabel = new JLabel("Turn: Red", JLabel.CENTER);
+        turnLabel = new JLabel("Lượt: ĐỎ", JLabel.CENTER);
         turnLabel.setFont(new Font("Arial", Font.BOLD, 20));
         turnLabel.setForeground(redTeamColor);
 
         // Nút thoát
-        JButton exitButton = new JButton("EXIT");
+        JButton exitButton = new JButton("THOÁT");
         exitButton.setFont(new Font("Arial", Font.BOLD, 20));
         exitButton.setBackground(emptyColor);
         exitButton.setFocusPainted(false);
         exitButton.setBorderPainted(false);
         exitButton.setContentAreaFilled(false);
-        exitButton.addActionListener(e -> System.exit(0));
+        exitButton.addActionListener(e -> {
+            cleanup();
+            parentFrame.showMenu();
+        });
 
         infoPanel.add(scorePanel);
         infoPanel.add(turnLabel);
@@ -147,22 +148,13 @@ public class ViewColorWars extends JFrame {
         gameOverScreen.setVisible(false);
         layeredPane.add(gameOverScreen, JLayeredPane.POPUP_LAYER);
 
-        setSize(PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), 
-                PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70);
-        setLocationRelativeTo(null);
+        setPreferredSize(new Dimension(PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15), 
+                PADDING * 2 + GRID_SIZE * (CELL_SIZE + 15) + 70));
         
-        // Khởi tạo AI một lần duy nhất khi tạo game
-        aiPlayer = new AIPlayer(gameLogic, false);
-        
-        setVisible(true);
-
-        // Thêm xử lý khi đóng cửa sổ
-        addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent e) {
-                cleanup();
-            }
-        });
+        // Khởi tạo AI nếu chơi với máy
+        if (isPlayWithBot) {
+            aiPlayer = new AIPlayer(gameLogic, false);
+        }
     }
 
     private void cleanup() {

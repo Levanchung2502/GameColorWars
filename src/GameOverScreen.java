@@ -22,13 +22,13 @@ public class GameOverScreen extends JPanel {
         titlePanel.setBorder(new EmptyBorder(20, 0, 0, 0));
 
         // Hiển thị "GAME OVER"
-        JLabel gameOverLabel = new JLabel("GAME OVER", SwingConstants.CENTER);
+        JLabel gameOverLabel = new JLabel("KẾT THÚC", SwingConstants.CENTER);
         gameOverLabel.setFont(new Font("Segoe UI", Font.BOLD, 48));
         gameOverLabel.setForeground(textColor);
         gameOverLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Hiển thị người chiến thắng
-        JLabel winnerLabel = new JLabel(winner + " WINS!", SwingConstants.CENTER);
+        JLabel winnerLabel = new JLabel(winner + " THẮNG !", SwingConstants.CENTER);
         winnerLabel.setFont(new Font("Segoe UI", Font.BOLD, 36));
         winnerLabel.setForeground(textColor);
         winnerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -44,11 +44,11 @@ public class GameOverScreen extends JPanel {
         buttonPanel.setBackground(backgroundColor);
 
         // Tạo nút "PLAY AGAIN"
-        JButton playAgainButton = createStyledButton("PLAY AGAIN");
+        JButton playAgainButton = createStyledButton("CHƠI LẠI");
         playAgainButton.addActionListener(e -> restartGameCallback.run());
 
         // Tạo nút "EXIT"
-        JButton exitButton = createStyledButton("EXIT");
+        JButton exitButton = createStyledButton("THOÁT");
         exitButton.addActionListener(e -> System.exit(0));
 
         // Thêm các nút vào panel
