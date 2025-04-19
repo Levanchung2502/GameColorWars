@@ -22,9 +22,9 @@ public class AIPlayer {
     private boolean simulationRedMoved;
     private boolean simulationBlueMoved;
 
-    private static final int MAX_DEPTH = 4;
+    private static final int MAX_DEPTH = 3;
     private int nodesExplored = 0;
-    private static final int MAX_NODES = 10000;
+    private static final int MAX_NODES = 15000;
 
     public AIPlayer(GameLogic gameLogic, boolean isRed) {
         this.gameLogic = gameLogic;

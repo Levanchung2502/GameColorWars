@@ -29,6 +29,9 @@ public class ViewColorWars extends JPanel {
     private GameOverScreen gameOverScreen;
     private JLayeredPane layeredPane;
     private ViewMenuGame parentFrame;
+    private JPanel mainPanel;
+    private Color redBgColor = new Color(252, 112, 112);
+    private Color blueBgColor = new Color(94, 224, 255);
 
     static {
         // Tăng kích thước heap cho JVM
@@ -53,11 +56,12 @@ public class ViewColorWars extends JPanel {
         layeredPane = new JLayeredPane();
         add(layeredPane, BorderLayout.CENTER);
 
-        JPanel mainPanel = new JPanel() {
+        mainPanel = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                g.setColor(backgroundColor);
+                boolean isRedTurn = gameLogic != null ? gameLogic.isRedTurn() : true;
+                g.setColor(isRedTurn ? redBgColor : blueBgColor);
                 g.fillRect(0, 0, getWidth(), getHeight());
             }
         };
@@ -255,6 +259,7 @@ public class ViewColorWars extends JPanel {
         SwingUtilities.invokeLater(() -> {
             scoreRed.setText(String.valueOf(scoreR));
             scoreBlue.setText(String.valueOf(scoreB));
+            updateBackgroundColor();
         });
     }
 
@@ -294,5 +299,12 @@ public class ViewColorWars extends JPanel {
         hideGameOver();
         gameLogic.resetGame();
         repaint();
+    }
+
+    // Update the background color when the game state changes
+    public void updateBackgroundColor() {
+        if (mainPanel != null) {
+            mainPanel.repaint();
+        }
     }
 }

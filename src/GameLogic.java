@@ -1,11 +1,11 @@
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
 import javax.swing.*;
-import java.util.List;
-import java.util.ArrayList;
 public class GameLogic extends JPanel {
     public static final int GRID_SIZE = 5;
     private static final int CELL_SIZE = 80;
@@ -20,6 +20,8 @@ public class GameLogic extends JPanel {
     private final JLabel turnLabel;
     private final ViewColorWars parent;
     private int scoreR = 0, scoreB = 0;
+    private Color redBgColor = new Color(252, 112, 112);
+    private Color blueBgColor = new Color(94, 224, 255);
 
     public GameLogic(Color emptyColor, Color blueTeamColor, Color redTeamColor, JLabel turnLabel, ViewColorWars parent) {
         this.emptyColor = emptyColor;
@@ -30,12 +32,16 @@ public class GameLogic extends JPanel {
         setLayout(null);
         setOpaque(false);
         initializeGrid();
+        updateCellHighlights();
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        setBackground(new Color(0, 0, 0, 0));
+        // Set background color based on turn
+        Color bgColor = isRedTurn ? redBgColor : blueBgColor;
+        g.setColor(bgColor);
+        g.fillRect(0, 0, getWidth(), getHeight());
     }
 
     private void initializeGrid() {
@@ -75,9 +81,12 @@ public class GameLogic extends JPanel {
                     blueHasMoved = true;
                 }
                 isRedTurn = !isRedTurn;
-                SoundManager.playScore();
+                // Play sound in a separate thread to avoid blocking UI
+                new Thread(() -> SoundManager.playScore()).start();
                 updateScoreDisplay();
                 updateTurnLabel();
+                updateCellHighlights();
+                repaint(); // Repaint to update background color
                 checkGameOver();
             }
         } else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
@@ -85,26 +94,31 @@ public class GameLogic extends JPanel {
             cell.setState(nextState);
             isRedTurn = !isRedTurn;
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
-                SoundManager.playExplosion();
+                // Explosion sound will be handled in explodeCell method
                 explodeCell(row, col, nextState, () -> {
-                    // Sau khi explode xong mới cập nhật giao diện và đổi lượt
                     SwingUtilities.invokeLater(() -> {
                         updateScoreDisplay();
+                        updateCellHighlights();
+                        repaint(); // Repaint to update background color
                     });
                 });
             } else {
-                SoundManager.playScore();
+                // Play sound in a separate thread to avoid blocking UI
+                new Thread(() -> SoundManager.playScore()).start();
                 updateTurnLabel();
+                updateCellHighlights();
+                repaint(); // Repaint to update background color
                 checkGameOver();
             }
         }
     }
 
     private void updateTurnLabel() {
-
         turnLabel.setText("Lượt: " + (isRedTurn ? "Đỏ" : "Xanh"));
         turnLabel.setForeground(isRedTurn ? redTeamColor : blueTeamColor);
 
+        // Update parent background
+        parent.updateBackgroundColor();
 
         // Đếm quân hiện tại
         int redCount = 0, blueCount = 0;
@@ -122,7 +136,6 @@ public class GameLogic extends JPanel {
         // Xử lý kích hoạt AI
         if (!isRedTurn) {
             if (redHasMoved && !isGameOver()) {
-
                 // Sử dụng SwingUtilities.invokeLater để tránh vấn đề với thread
                 SwingUtilities.invokeLater(new Runnable() {
                     @Override
@@ -130,7 +143,6 @@ public class GameLogic extends JPanel {
                         try {
                             parent.activateAI();
                         } catch (Exception e) {
-
                             e.printStackTrace();
                         }
                     }
@@ -139,10 +151,27 @@ public class GameLogic extends JPanel {
         }
     }
 
+    private void updateCellHighlights() {
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                Cell cell = grid[row][col];
+                CellState state = cell.getState();
+                
+                // Highlight cells of the current turn's color
+                if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
+                    cell.setHighlighted(true);
+                } else {
+                    cell.setHighlighted(false);
+                }
+            }
+        }
+    }
+
     private void explodeCell(int row, int col, CellState explodingState, Runnable onFinish) {
         new Thread(() -> {
             Queue<int[]> queue = new LinkedList<>();
             queue.add(new int[]{row, col});
+            SoundManager.playExplosion(); // Play sound for initial explosion
 
             while (!queue.isEmpty()) {
                 List<int[]> nextExplosions = new ArrayList<>();
@@ -183,7 +212,6 @@ public class GameLogic extends JPanel {
                             neighbor.setState(isRed ? CellState.RED_ONE : CellState.BLUE_ONE);
                         }
 
-
                         if (neighbor.getState() == CellState.RED_FOUR || neighbor.getState() == CellState.BLUE_FOUR) {
                             nextExplosions.add(new int[]{newRow, newCol});
                         }
@@ -191,6 +219,11 @@ public class GameLogic extends JPanel {
                 }
 
                 sleep(800);
+                
+                // Play explosion sound for each subsequent chain reaction if there are any
+                if (!nextExplosions.isEmpty()) {
+                    SoundManager.playExplosion();
+                }
 
                 queue.addAll(nextExplosions);
             }
@@ -295,6 +328,8 @@ public class GameLogic extends JPanel {
                 grid[row][col].setState(CellState.EMPTY);
             }
         }
+        updateCellHighlights();
+        repaint(); // Repaint to update background color
         parent.reinitializeAI();
     }
 
@@ -308,6 +343,8 @@ public class GameLogic extends JPanel {
 
     public void setRedTurn(boolean redTurn) {
         isRedTurn = redTurn;
+        updateCellHighlights();
+        repaint(); // Repaint to update background color
     }
 
     public boolean isRedHasMoved() {
@@ -372,8 +409,5 @@ public class GameLogic extends JPanel {
             }
         }
         parent.updateScoreDisplay(scoreR, scoreB);
-
     }
-
-
 }
