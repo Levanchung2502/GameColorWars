@@ -1,38 +1,66 @@
 import java.awt.*;
+import java.awt.geom.Rectangle2D;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 
 public class GameOverScreen extends JPanel {
-    private final Color backgroundColor = new Color(255, 164, 128);
-    private final Color buttonHoverColor = new Color(255, 140, 100);
+    private final Color defaultBackgroundColor = new Color(255, 164, 128);
+    private final Color redBackgroundColor = new Color(255, 182, 182);
+    private final Color blueBackgroundColor = new Color(185, 232, 255);
     private final Color buttonColor = new Color(255, 200, 170);
     private final Color textColor = new Color(80, 40, 0);
+    private final Color redTeamColor = new Color(255, 82, 82);
+    private final Color blueTeamColor = new Color(8, 168, 247);
     private final Runnable restartGameCallback;
     private final ViewMenuGame parentFrame;
+    private final String winner;
 
     public GameOverScreen(String winner, Runnable restartGameCallback, ViewMenuGame parent) {
         this.restartGameCallback = restartGameCallback;
         this.parentFrame = parent;
-        setLayout(new BorderLayout(0, 30));  // Thêm khoảng cách giữa các thành phần
-        setBackground(backgroundColor);
-        setBorder(new EmptyBorder(50, 0, 50, 0));  // Thêm padding cho panel
+        this.winner = winner;
+
+        final Color bgColor;
+        if (winner.equals("ĐỎ")) {
+            bgColor = redBackgroundColor;
+        } else if (winner.equals("XANH")) {
+            bgColor = blueBackgroundColor;
+        } else {
+            bgColor = defaultBackgroundColor;
+        }
+        
+        setLayout(new BorderLayout(0, 30));
+        setBackground(bgColor);
+        setBorder(new EmptyBorder(50, 0, 50, 0));
 
         // Panel chứa tiêu đề
-        JPanel titlePanel = new JPanel();
+        JPanel titlePanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                setBackground(bgColor);
+            }
+        };
         titlePanel.setLayout(new BoxLayout(titlePanel, BoxLayout.Y_AXIS));
-        titlePanel.setBackground(backgroundColor);
         titlePanel.setBorder(new EmptyBorder(20, 0, 0, 0));
 
-        // Hiển thị "GAME OVER"
-        JLabel gameOverLabel = new JLabel("KẾT THÚC", SwingConstants.CENTER);
-        gameOverLabel.setFont(new Font("Segoe UI", Font.BOLD, 48));
+        // Custom game over label with enhanced visuals
+        JLabel gameOverLabel = new EnhancedLabel("KẾT THÚC", SwingConstants.CENTER);
+        gameOverLabel.setFont(new Font("Arial", Font.BOLD, 52));
         gameOverLabel.setForeground(textColor);
         gameOverLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Hiển thị người chiến thắng
-        JLabel winnerLabel = new JLabel(winner + " THẮNG !", SwingConstants.CENTER);
-        winnerLabel.setFont(new Font("Segoe UI", Font.BOLD, 36));
-        winnerLabel.setForeground(textColor);
+        // Custom winner label with enhanced visuals
+        JLabel winnerLabel = new EnhancedLabel(winner + " THẮNG !", SwingConstants.CENTER);
+        winnerLabel.setFont(new Font("Arial", Font.BOLD, 40));
+        // Set the winner's color
+        if (winner.equals("ĐỎ")) {
+            winnerLabel.setForeground(redTeamColor);
+        } else if (winner.equals("XANH")) {
+            winnerLabel.setForeground(blueTeamColor);
+        } else {
+            winnerLabel.setForeground(textColor);
+        }
         winnerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         titlePanel.add(gameOverLabel);
@@ -41,9 +69,14 @@ public class GameOverScreen extends JPanel {
         add(titlePanel, BorderLayout.NORTH);
 
         // Panel chứa nút
-        JPanel buttonPanel = new JPanel();
+        JPanel buttonPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                setBackground(bgColor);
+            }
+        };
         buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-        buttonPanel.setBackground(backgroundColor);
 
         // Tạo nút "PLAY AGAIN"
         JButton playAgainButton = createStyledButton("CHƠI LẠI");
@@ -70,31 +103,91 @@ public class GameOverScreen extends JPanel {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 
-                if (getModel().isPressed()) {
-                    g2.setColor(buttonHoverColor.darker());
-                } else if (getModel().isRollover()) {
-                    g2.setColor(buttonHoverColor);
-                } else {
-                    g2.setColor(buttonColor);
+                // Create gradient based on winner color
+                Color buttonBaseColor = buttonColor;
+                if (winner.equals("ĐỎ")) {
+                    buttonBaseColor = new Color(255, 210, 200);
+                } else if (winner.equals("XANH")) {
+                    buttonBaseColor = new Color(210, 230, 255);
                 }
                 
+                Color buttonTopColor = new Color(
+                    Math.min(255, buttonBaseColor.getRed() + 20),
+                    Math.min(255, buttonBaseColor.getGreen() + 20),
+                    Math.min(255, buttonBaseColor.getBlue() + 20)
+                );
+                
+                if (getModel().isPressed()) {
+                    buttonTopColor = buttonBaseColor;
+                    buttonBaseColor = buttonBaseColor.darker();
+                } else if (getModel().isRollover()) {
+                    buttonTopColor = new Color(
+                        Math.min(255, buttonTopColor.getRed() + 10),
+                        Math.min(255, buttonTopColor.getGreen() + 10),
+                        Math.min(255, buttonTopColor.getBlue() + 10)
+                    );
+                }
+                
+                GradientPaint gp = new GradientPaint(
+                    0, 0, buttonTopColor, 
+                    0, getHeight(), buttonBaseColor
+                );
+                
+                g2.setPaint(gp);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 20, 20);
+                
+                // Add a subtle border
+                g2.setColor(new Color(0, 0, 0, 40));
+                g2.setStroke(new BasicStroke(1.5f));
+                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, 20, 20);
+                
                 g2.dispose();
                 
                 super.paintComponent(g);
             }
         };
 
-        button.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        button.setFont(new Font("Arial", Font.BOLD, 26));
         button.setForeground(textColor);
         button.setAlignmentX(Component.CENTER_ALIGNMENT);
-        button.setMaximumSize(new Dimension(200, 50));
-        button.setPreferredSize(new Dimension(200, 50));
+        button.setMaximumSize(new Dimension(200, 60));
+        button.setPreferredSize(new Dimension(200, 60));
         button.setContentAreaFilled(false);
         button.setBorderPainted(false);
         button.setFocusPainted(false);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
         return button;
+    }
+    
+    // Custom label class with text effects
+    private class EnhancedLabel extends JLabel {
+        public EnhancedLabel(String text, int alignment) {
+            super(text, alignment);
+        }
+        
+        @Override
+        protected void paintComponent(Graphics g) {
+            Graphics2D g2d = (Graphics2D) g.create();
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            
+            // Get the text and layout information
+            FontMetrics fm = g2d.getFontMetrics(getFont());
+            Rectangle2D textBounds = fm.getStringBounds(getText(), g2d);
+            int textX = (getWidth() - (int) textBounds.getWidth()) / 2;
+            int textY = (getHeight() - (int) textBounds.getHeight()) / 2 + fm.getAscent();
+            
+            // Draw text shadow
+            g2d.setColor(new Color(0, 0, 0, 60));
+            g2d.drawString(getText(), textX + 3, textY + 3);
+            
+            // Draw the actual text with a subtle outline
+            g2d.setColor(getForeground());
+            g2d.drawString(getText(), textX, textY);
+            
+            g2d.dispose();
+        }
     }
 }
