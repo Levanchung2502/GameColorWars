@@ -6,18 +6,12 @@ public class ViewMenuGame extends JFrame {
     private final CardLayout cardLayout;
     private final JPanel mainPanel;
     private ViewColorWars gamePanel;
-
     private static final int WINDOW_WIDTH = 2 * 20 + 5 * (80 + 15);  // 2*PADDING + GRID_SIZE*(CELL_SIZE + 15)
     private static final int WINDOW_HEIGHT = 2 * 20 + 5 * (80 + 15) + 70;  // 2*PADDING + GRID_SIZE*(CELL_SIZE + 15) + 70
-
-    // Đồng bộ với GameOverScreen
     private final Color backgroundColor = new Color(255, 164, 128);
-    private final Color redBackgroundColor = new Color(255, 182, 182);
-    private final Color blueBackgroundColor = new Color(185, 232, 255);
     private final Color buttonColor = new Color(255, 200, 170);
     private final Color textColor = new Color(80, 40, 0);
-    private final Color redTeamColor = new Color(255, 82, 82);
-    private final Color blueTeamColor = new Color(8, 168, 247);
+
 
     public ViewMenuGame() {
         setTitle("Color Wars");
@@ -37,7 +31,6 @@ public class ViewMenuGame extends JFrame {
         setVisible(true);
     }
 
-    // Giao diện menu chính
     private JPanel createMenuPanel() {
         JPanel panel = new JPanel() {
             @Override
@@ -57,7 +50,6 @@ public class ViewMenuGame extends JFrame {
         };
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
 
-        // Enhanced title with shadow effect
         EnhancedLabel title = new EnhancedLabel("COLOR WARS", new Font("Arial", Font.BOLD, 54), textColor, true, true);
         title.setAlignmentX(Component.CENTER_ALIGNMENT);
 
@@ -69,7 +61,6 @@ public class ViewMenuGame extends JFrame {
         botBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
         guideBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        // Sự kiện cho các nút
         friendBtn.addActionListener(e -> startGame(false));
         botBtn.addActionListener(e -> startGame(true));
         guideBtn.addActionListener(e -> cardLayout.show(mainPanel, "guide"));
@@ -105,7 +96,6 @@ public class ViewMenuGame extends JFrame {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-                // Create gradient effect
                 Color buttonTopColor = new Color(
                     Math.min(255, buttonColor.getRed() + 20),
                     Math.min(255, buttonColor.getGreen() + 20),

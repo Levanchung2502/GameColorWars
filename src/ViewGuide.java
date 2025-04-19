@@ -26,8 +26,10 @@ public class ViewGuide extends JPanel {
 
                  Cách chơi:
                 - Lượt đầu tiên của mỗi người chơi khi chọn vào một ô sẽ được 3 chấm.
+                - Sau đó mỗi lượt người chơi chọn vào ô màu của mình để tăng giá trị của chấm.
                 - Khi một ô được 4 chấm nó sẽ tỏa ra các ô xung quanh trên, dưới, trái, phải tương đương với ô đó sẽ là 1 chấm, nếu những ô có sẵn chấm thì sẽ cộng thêm 1 chấm.
                 - Trò chơi kết thúc khi đối phương không còn chấm nào trên bàn cờ.
+                - Nếu có ô mới nào đạt 4 chấm do vụ nổ trước đó, nó cũng sẽ phát nổ tiếp gây ra phản ứng dây chuyền\s
                 """;
 
         JTextArea textArea = new JTextArea(instructions);

@@ -22,9 +22,9 @@ public class AIPlayer {
     private boolean simulationRedMoved;
     private boolean simulationBlueMoved;
 
-    private static final int MAX_DEPTH = 3;
+    private static final int MAX_DEPTH = 4;
     private int nodesExplored = 0;
-    private static final int MAX_NODES = 15000;
+    private static final int MAX_NODES = 50000;
 
     public AIPlayer(GameLogic gameLogic, boolean isRed) {
         this.gameLogic = gameLogic;
@@ -101,7 +101,7 @@ public class AIPlayer {
         nodesExplored = 0;
         startTime = System.currentTimeMillis();
         
-        List<Move> possibleMoves = getAllPossibleMoves();
+        List<Move> possibleMoves = getPossibleMoves(false);
         if (possibleMoves.isEmpty()) {
             return null;
         }
@@ -147,6 +147,7 @@ public class AIPlayer {
         return elapsedTime > 5000;
     }
 
+    //Tạo bảng mô phỏng
     private void prepareSimulation() {
         Cell[][] originalGrid = gameLogic.getGrid();
         for (int row = 0; row < GRID_SIZE; row++) {
@@ -159,6 +160,7 @@ public class AIPlayer {
         simulationBlueMoved = gameLogic.isBlueHasMoved();
     }
 
+    //Chuyển trạng thái ô thành mã số
     private byte convertStateToCode(CellState state) {
         switch (state) {
             case EMPTY: return 0;
@@ -174,6 +176,7 @@ public class AIPlayer {
         }
     }
 
+    //Chuyển mã số thành trạng thái ô
     private CellState convertCodeToState(byte code) {
         switch (code) {
             case 0: return CellState.EMPTY;
@@ -212,6 +215,7 @@ public class AIPlayer {
         simulationRedTurn = !simulationRedTurn;
     }
 
+    //Mô phỏng nổ
     private void simulateExplosion(int row, int col, CellState explodingState) {
         int[][] explosionQueue = new int[GRID_SIZE * GRID_SIZE][2];
         int queueStart = 0;
@@ -281,7 +285,7 @@ public class AIPlayer {
             return evaluateSimulationBoard();
         }
 
-        List<Move> possibleMoves = getSimulationPossibleMoves();
+        List<Move> possibleMoves = getPossibleMoves(true);
         if (possibleMoves.isEmpty()) {
             return evaluateSimulationBoard();
         }
@@ -340,6 +344,7 @@ public class AIPlayer {
         }
     }
 
+    //Kiểm tra xem trò chơi đã kết thúc hay chưa
     private boolean isSimulationGameOver() {
         if (!simulationRedMoved || !simulationBlueMoved) {
             return false;
@@ -362,91 +367,7 @@ public class AIPlayer {
         return (redCount == 0 || blueCount == 0) && (redCount + blueCount > 1);
     }
 
-    private List<Move> getSimulationPossibleMoves() {
-        List<Move> moves = new ArrayList<>();
-        boolean isRedTurn = simulationRedTurn;
-
-        // Xử lý đặc biệt cho nước đi đầu tiên
-        if ((isRedTurn && !simulationRedMoved) || (!isRedTurn && !simulationBlueMoved)) {
-            // Tìm vị trí quân của người chơi (nếu có)
-            int playerRow = -1, playerCol = -1;
-            for (int row = 0; row < GRID_SIZE; row++) {
-                for (int col = 0; col < GRID_SIZE; col++) {
-                    CellState state = convertCodeToState(simulationGrid[row][col]);
-                    if ((isRedTurn && state.isBlue()) || (!isRedTurn && state.isRed())) {
-                        playerRow = row;
-                        playerCol = col;
-                        break;
-                    }
-                }
-            }
-
-            // Nếu người chơi đã đặt quân
-            if (playerRow != -1 && playerCol != -1) {
-                // Ưu tiên các góc xa người chơi
-                int[][] corners = {{0, 0}, {0, GRID_SIZE-1}, {GRID_SIZE-1, 0}, {GRID_SIZE-1, GRID_SIZE-1}};
-                for (int[] corner : corners) {
-                    if (convertCodeToState(simulationGrid[corner[0]][corner[1]]) == CellState.EMPTY &&
-                        Math.abs(corner[0] - playerRow) + Math.abs(corner[1] - playerCol) >= 3) {
-                        moves.add(new Move(corner[0], corner[1]));
-                    }
-                }
-                
-                // Nếu không có góc phù hợp, tìm các vị trí cách xa người chơi
-                if (moves.isEmpty()) {
-                    for (int row = 0; row < GRID_SIZE; row++) {
-                        for (int col = 0; col < GRID_SIZE; col++) {
-                            if (convertCodeToState(simulationGrid[row][col]) == CellState.EMPTY) {
-                                int distance = Math.abs(row - playerRow) + Math.abs(col - playerCol);
-                                if (distance >= 3) { // Chỉ chọn các vị trí cách xa ít nhất 3 ô
-                    moves.add(new Move(row, col));
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Nếu là nước đi đầu tiên của cả ván, ưu tiên vị trí trung tâm hoặc góc
-                int center = GRID_SIZE / 2;
-                if (convertCodeToState(simulationGrid[center][center]) == CellState.EMPTY) {
-                    moves.add(new Move(center, center));
-                } else {
-                    // Nếu trung tâm đã bị chiếm, chọn góc
-                    int[][] corners = {{0, 0}, {0, GRID_SIZE-1}, {GRID_SIZE-1, 0}, {GRID_SIZE-1, GRID_SIZE-1}};
-                    for (int[] corner : corners) {
-                        if (convertCodeToState(simulationGrid[corner[0]][corner[1]]) == CellState.EMPTY) {
-                            moves.add(new Move(corner[0], corner[1]));
-                        }
-                    }
-                }
-            }
-
-            // Nếu vẫn không tìm được nước đi phù hợp, thêm tất cả các ô trống còn lại
-            if (moves.isEmpty()) {
-                for (int row = 0; row < GRID_SIZE; row++) {
-                    for (int col = 0; col < GRID_SIZE; col++) {
-                        if (convertCodeToState(simulationGrid[row][col]) == CellState.EMPTY) {
-                            moves.add(new Move(row, col));
-                        }
-                    }
-                }
-            }
-        return moves;
-    }
-
-        // Xử lý các nước đi tiếp theo như bình thường
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                CellState state = convertCodeToState(simulationGrid[row][col]);
-                if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
-                    moves.add(new Move(row, col));
-                }
-            }
-        }
-
-        return moves;
-    }
-
+    //Đánh giá các nước đi
     private int evaluateSimulationBoard() {
         int score = 0;
 
@@ -456,7 +377,7 @@ public class AIPlayer {
         int myThreeDots = 0, oppThreeDots = 0;
         int chainPotentialScore = 0;
         int opponentChainThreat = 0;
-        int opponentThreeDotThreat = 0;
+        int positionScore = 0;  // Thêm điểm vị trí
 
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
@@ -469,13 +390,15 @@ public class AIPlayer {
                     if (dots >= 2) {
                         chainPotentialScore += evaluateChainPotential(simulationGrid, row, col, isRed);
                     }
+                    
+                    // Đánh giá vị trí chiến lược
+                    positionScore += evaluatePosition(row, col, dots, isRed);
                 } else if ((isRed && state.isBlue()) || (!isRed && state.isRed())) {
                     oppPieces++;
                     int dots = getDotCount(state);
                     oppDots += dots;
                     if (dots == 3) {
                         oppThreeDots++;
-                        opponentThreeDotThreat += evaluateThreeDotThreat(simulationGrid, row, col, isRed);
                     }
                     if (dots >= 2) {
                         opponentChainThreat += evaluateOpponentChainThreat(simulationGrid, row, col, isRed);
@@ -490,51 +413,198 @@ public class AIPlayer {
 
         // Tính điểm tổng hợp với trọng số mới
         score = (myPieces - oppPieces) * 200 +                    // Trọng số cho số lượng quân
-                (myDots - oppDots) * 150 +                        // Trọng số cho tổng số điểm
-                (myThreeDots) * 800 +                             // INCREASED weight for 3-dot pieces
-                chainPotentialScore * 600 -                       // INCREASED weight for chain potential
-                opponentChainThreat * 350 -                       // Trừ điểm cho mối đe dọa từ đối phương
-                opponentThreeDotThreat * 500;                     // Trừ điểm mạnh cho mối đe dọa từ quân 3 điểm đối phương
+                (myDots - oppDots) * 180 +                        // Tăng trọng số cho tổng số điểm
+                (myThreeDots) * 1000 +                            // Tăng mạnh trọng số cho quân 3 điểm
+                chainPotentialScore * 750 -                       // Tăng trọng số khả năng tạo chuỗi nổ
+                opponentChainThreat * 500 +                       // Tăng trọng số cho mối đe dọa từ đối phương
+                positionScore * 300;                              // Thêm điểm vị trí chiến lược
 
+        // Tỷ lệ quân tương đối
+        if (oppPieces > 0) {
+            float pieceRatio = (float) myPieces / oppPieces;
+            if (pieceRatio > 1.5) {
+                score += 800;  
+            }
+        }
+        
+        // Điểm phạt khi bị đối thủ bao vây
+        int surroundedPenalty = evaluateSurroundedPieces(simulationGrid, isRed);
+        score -= surroundedPenalty * 250;
+        
         // Thêm điểm thưởng cho các tình huống đặc biệt
         if (myPieces > oppPieces) {
             score += 500;
         }
         
         if (myThreeDots > 0) {
-            score += 700; // INCREASED bonus for having 3-dot pieces
+            score += 900; // Tăng điểm thưởng cho việc có quân 3 điểm
         }
 
         return score;
     }
 
+    // Đánh giá vị trí chiến lược
+    private int evaluatePosition(int row, int col, int dots, boolean isRed) {
+        int posScore = 0;
+        
+        // Vị trí góc có giá trị cao vì khó bị bao vây
+        if ((row == 0 || row == GRID_SIZE-1) && (col == 0 || col == GRID_SIZE-1)) {
+            posScore += 50;
+        }
+        
+        // Vị trí cạnh có giá trị trung bình
+        else if (row == 0 || row == GRID_SIZE-1 || col == 0 || col == GRID_SIZE-1) {
+            posScore += 25;
+        }
+        
+        // Vị trí trung tâm có giá trị cho việc kiểm soát bàn cờ
+        int center = GRID_SIZE / 2;
+        int distanceToCenter = Math.abs(row - center) + Math.abs(col - center);
+        if (distanceToCenter <= 1) {
+            posScore += 40;
+        }
+        
+        // Quân 3 điểm ở vị trí tốt có giá trị rất cao
+        if (dots == 3) {
+            posScore += 30;
+            
+            // Đặc biệt cao nếu ở vị trí có thể gây chuỗi nổ
+            int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+            for (int[] dir : directions) {
+                int newRow = row + dir[0], newCol = col + dir[1];
+                if (isValidPosition(newRow, newCol)) {
+                    CellState neighborState = convertCodeToState(simulationGrid[newRow][newCol]);
+                    // Tăng giá trị nếu kế bên là quân cùng màu
+                    if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
+                        posScore += 40;
+                    }
+                }
+            }
+        }
+        
+        return posScore;
+    }
+
+    //Đánh giá mức độ bị bao vây
+    private int evaluateSurroundedPieces(byte[][] grid, boolean isRed) {
+        int surroundedCount = 0;
+        
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state = convertCodeToState(grid[row][col]);
+                
+                // Chỉ xét quân của chúng ta
+                if ((isRed && state.isRed()) || (!isRed && state.isBlue())) {
+                    int opponentNeighbors = 0;
+                    int totalNeighbors = 0;
+                    
+                    int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+                    for (int[] dir : directions) {
+                        int newRow = row + dir[0], newCol = col + dir[1];
+                        if (isValidPosition(newRow, newCol)) {
+                            totalNeighbors++;
+                            CellState neighborState = convertCodeToState(grid[newRow][newCol]);
+                            if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
+                                opponentNeighbors++;
+                            }
+                        }
+                    }
+                    
+                    // Nếu đa số hàng xóm là quân đối phương, quân này bị bao vây
+                    if (opponentNeighbors > totalNeighbors / 2) {
+                        surroundedCount++;
+                    }
+                }
+            }
+        }
+        
+        return surroundedCount;
+    }
+
+
+    //Đánh giá khả năng tạo chuỗi nổ
     private int evaluateChainPotential(byte[][] grid, int row, int col, boolean isRed) {
         int chainScore = 0;
         int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        
+        // Đánh giá quân hiện tại
+        CellState currentState = convertCodeToState(grid[row][col]);
+        int currentDots = getDotCount(currentState);
+        
+        // Quân càng nhiều điểm càng có khả năng tạo chuỗi nổ
+        chainScore += currentDots * 20;
 
+        // Đánh giá các quân xung quanh
         for (int[] dir : directions) {
             int newRow = row + dir[0];
             int newCol = col + dir[1];
 
             if (isValidPosition(newRow, newCol)) {
                 CellState neighborState = convertCodeToState(grid[newRow][newCol]);
-                // Tăng điểm cho chuỗi nổ tiềm năng
-                if ((isRed && neighborState.isRed() && getDotCount(neighborState) >= 2) ||
-                    (!isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2)) {
-                    chainScore += 40; // Tăng gấp đôi điểm cho khả năng tạo chuỗi
+                
+                // Tăng điểm cho chuỗi nổ tiềm năng với quân cùng màu
+                if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
+                    int neighborDots = getDotCount(neighborState);
+
+                    chainScore += 40 + neighborDots * 15;
+                    
+                    // Đặc biệt ưu tiên chuỗi có quân 3 điểm
+                    if (neighborDots == 3 || currentDots == 3) {
+                        chainScore += 100;
+                    }
+
+                    if ((currentDots == 2 && neighborDots == 3) || 
+                        (currentDots == 3 && neighborDots == 2) ||
+                        (currentDots == 2 && neighborDots == 2) ||
+                        (currentDots == 3 && neighborDots == 3)) {
+                        chainScore += 120;
+                    }
                 }
+                
                 // Tăng điểm cho khả năng ảnh hưởng đến quân đối phương
                 if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
-                    chainScore += 30; // Tăng gấp đôi điểm cho khả năng tấn công đối thủ
+                    chainScore += 60;
+                    
+                    // Nếu quân đối phương có nhiều điểm, gây ảnh hưởng có giá trị cao
+                    int oppDots = getDotCount(neighborState);
+                    if (oppDots >= 2) {
+                        chainScore += oppDots * 20;
+                    }
                 }
             }
         }
+        
+        // Đánh giá chuỗi mở rộng hơn (kiểm tra các quân cách 2 ô)
+        if (currentDots >= 2) {
+            for (int[] dir1 : directions) {
+                for (int[] dir2 : directions) {
+                    int extendedRow = row + dir1[0] + dir2[0];
+                    int extendedCol = col + dir1[1] + dir2[1];
+                    
+                    if (isValidPosition(extendedRow, extendedCol)) {
+                        CellState extendedState = convertCodeToState(grid[extendedRow][extendedCol]);
+                        if ((isRed && extendedState.isRed() && getDotCount(extendedState) >= 2) ||
+                            (!isRed && extendedState.isBlue() && getDotCount(extendedState) >= 2)) {
+                            chainScore += 30;
+                        }
+                    }
+                }
+            }
+        }
+        
         return chainScore;
     }
 
+    // Cải thiện đánh giá mối đe dọa từ đối phương
     private int evaluateOpponentChainThreat(byte[][] grid, int row, int col, boolean isRed) {
         int threatScore = 0;
         int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        
+        CellState currentState = convertCodeToState(grid[row][col]);
+        int currentDots = getDotCount(currentState);
+        
+        // Quân đối phương càng nhiều điểm càng nguy hiểm
+        threatScore += currentDots * 30;
 
         for (int[] dir : directions) {
             int newRow = row + dir[0];
@@ -542,48 +612,56 @@ public class AIPlayer {
 
             if (isValidPosition(newRow, newCol)) {
                 CellState neighborState = convertCodeToState(grid[newRow][newCol]);
-                // Tăng điểm cho mối đe dọa từ đối phương
-                if ((isRed && neighborState.isBlue() && getDotCount(neighborState) >= 2) ||
-                    (!isRed && neighborState.isRed() && getDotCount(neighborState) >= 2)) {
-                    threatScore += 50;
+                
+                // Đánh giá mối đe dọa từ quân khác của đối phương
+                if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
+                    int neighborDots = getDotCount(neighborState);
+                    threatScore += 50 + neighborDots * 20;
+                    
+                    // Mối đe dọa cao với chuỗi 2-2, 2-3, 3-2, 3-3
+                    if ((currentDots == 2 && neighborDots == 2) ||
+                        (currentDots == 2 && neighborDots == 3) ||
+                        (currentDots == 3 && neighborDots == 2) ||
+                        (currentDots == 3 && neighborDots == 3)) {
+                        threatScore += 150;
+                    }
+                    
+                    // Đánh giá mối đe dọa từ quân 3 điểm đối phương (từ hàm evaluateThreeDotThreat)
+                    if (neighborDots == 3) {
+                        threatScore += 100;
+                    }
+                }
+                
+                // Đánh giá mối đe dọa đến quân của chúng ta
+                if ((isRed && neighborState.isRed()) || (!isRed && neighborState.isBlue())) {
+                    threatScore += 40; // Quân đối phương gần quân của chúng ta
                 }
             }
         }
+        
+        // Kiểm tra mẫu hình đe dọa đặc biệt: quân 3 điểm có thể gây chuỗi nổ
+        if (currentDots == 3) {
+            int threatCount = 0;
+            for (int[] dir : directions) {
+                int newRow = row + dir[0];
+                int newCol = col + dir[1];
+                
+                if (isValidPosition(newRow, newCol)) {
+                    CellState neighborState = convertCodeToState(grid[newRow][newCol]);
+                    // Nếu hàng xóm cùng màu với đối phương
+                    if ((isRed && neighborState.isBlue()) || (!isRed && neighborState.isRed())) {
+                        threatCount++;
+                    }
+                }
+            }
+            
+            // Nếu quân 3 điểm có ít nhất 2 quân liền kề cùng màu, tăng mạnh điểm đe dọa
+            if (threatCount >= 2) {
+                threatScore += 250;
+            }
+        }
+        
         return threatScore;
-    }
-
-    private int evaluateThreeDotThreat(byte[][] grid, int row, int col, boolean isRed) {
-        int threatScore = 0;
-        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-
-        for (int[] dir : directions) {
-            int newRow = row + dir[0];
-            int newCol = col + dir[1];
-
-            if (isValidPosition(newRow, newCol)) {
-                CellState neighborState = convertCodeToState(grid[newRow][newCol]);
-                // Tăng điểm cho mối đe dọa từ quân 3 điểm đối phương
-                if ((isRed && neighborState.isBlue() && getDotCount(neighborState) == 3) ||
-                    (!isRed && neighborState.isRed() && getDotCount(neighborState) == 3)) {
-                    threatScore += 100; // Tăng điểm mạnh cho mối đe dọa từ quân 3 điểm
-                }
-            }
-        }
-        return threatScore;
-    }
-
-    private int countPieces() {
-        int count = 0;
-        Cell[][] grid = gameLogic.getGrid();
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
-                if (state != CellState.EMPTY) {
-                    count++;
-                }
-            }
-        }
-        return count;
     }
 
     private int getDotCount(CellState state) {
@@ -613,110 +691,176 @@ public class AIPlayer {
         return (s1.isRed() && s2.isBlue()) || (s1.isBlue() && s2.isRed());
     }
 
-    // Phương thức để kiểm tra xem AI có đang hoạt động hay không
-    private List<Move> getAllPossibleMoves() {
-        List<Move> moves = new ArrayList<>();
-        List<Move> explosionMoves = new ArrayList<>(); // Special list for moves that cause explosions
-        boolean isRedTurn = gameLogic.isRedTurn();
-        Cell[][] grid = gameLogic.getGrid();
 
-        // First, check for any 3-dot pieces that can be clicked to create explosions (4-dot)
+     //Tìm tất cả các nước đi có thể cho AI trong bất kỳ trạng thái nào.
+     // isSimulation true nếu đang trong mô phỏng (sử dụng simulationGrid), false nếu đang tìm nước đi thực tế
+
+    private List<Move> getPossibleMoves(boolean isSimulation) {
+        List<Move> moves = new ArrayList<>();
+        
+        // Xác định trạng thái và dữ liệu hiện tại dựa trên mode
+        boolean isCurrentRedTurn, isRedHasMoved, isBlueHasMoved;
+        
+        if (isSimulation) {
+            isCurrentRedTurn = simulationRedTurn;
+            isRedHasMoved = simulationRedMoved;
+            isBlueHasMoved = simulationBlueMoved;
+        } else {
+            isCurrentRedTurn = gameLogic.isRedTurn();
+            isRedHasMoved = gameLogic.isRedHasMoved();
+            isBlueHasMoved = gameLogic.isBlueHasMoved();
+        }
+        
+        // 1. Ưu tiên nước đi nổ từ quân 3 điểm (quân có 3 điểm)
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
+                CellState state;
                 
-                // Find 3-dot pieces of our color
-                if ((isRedTurn && state == CellState.RED_THREE) || 
-                    (!isRedTurn && state == CellState.BLUE_THREE)) {
-                    Move explosionMove = new Move(row, col);
-                    explosionMoves.add(explosionMove);
+                if (isSimulation) {
+                    state = convertCodeToState(simulationGrid[row][col]);
+                } else {
+                    state = gameLogic.getGrid()[row][col].getState();
+                }
+                
+                if ((isCurrentRedTurn && state == CellState.RED_THREE) || 
+                    (!isCurrentRedTurn && state == CellState.BLUE_THREE)) {
+                    return Collections.singletonList(new Move(row, col)); // Ưu tiên cao nhất, trả về ngay
                 }
             }
         }
         
-        // If we found explosion moves, prioritize them highly
-        if (!explosionMoves.isEmpty()) {
-            return explosionMoves;
-        }
-
-        // For first moves, consider all positions with slight preference for strategic positions
-        if ((isRedTurn && !gameLogic.isRedHasMoved()) || (!isRedTurn && !gameLogic.isBlueHasMoved())) {
+        // 2. Xử lý nước đi đầu tiên của mỗi màu
+        if ((isCurrentRedTurn && !isRedHasMoved) || (!isCurrentRedTurn && !isBlueHasMoved)) {
+            int center = GRID_SIZE / 2;
             List<Move> strategicMoves = new ArrayList<>();
-            List<Move> normalMoves = new ArrayList<>();
-
-            // Consider all empty cells, but prioritize strategic ones
-            for (int row = 0; row < GRID_SIZE; row++) {
-                for (int col = 0; col < GRID_SIZE; col++) {
-                    if (grid[row][col].getState() == CellState.EMPTY) {
-                        Move move = new Move(row, col);
-
-                        // Check if this is a strategic position (near center)
-                        int center = GRID_SIZE / 2;
-                        int distanceToCenter = Math.abs(row - center) + Math.abs(col - center);
-
-                        if (distanceToCenter <= 2) {
-                            strategicMoves.add(move);
-                        } else {
-                            normalMoves.add(move);
+            
+            // Nếu trong mô phỏng và đối thủ đã di chuyển, ưu tiên các vị trí xa đối thủ
+            if (isSimulation && ((!isCurrentRedTurn && isRedHasMoved) || (isCurrentRedTurn && isBlueHasMoved))) {
+                // Tìm vị trí quân của đối thủ
+                int opponentRow = -1, opponentCol = -1;
+                
+                for (int row = 0; row < GRID_SIZE; row++) {
+                    for (int col = 0; col < GRID_SIZE; col++) {
+                        CellState state = convertCodeToState(simulationGrid[row][col]);
+                        if ((isCurrentRedTurn && state.isBlue()) || (!isCurrentRedTurn && state.isRed())) {
+                            opponentRow = row;
+                            opponentCol = col;
+                            break;
                         }
                     }
+                    if (opponentRow != -1) break;
                 }
-            }
-
-            // Combine the lists with strategic moves first
-            moves.addAll(strategicMoves);
-            moves.addAll(normalMoves);
-
-            return moves;
-        }
-
-        // For subsequent moves, prioritize pieces with higher dot counts
-        List<Move> highDotMoves = new ArrayList<>(); // For 2-dot pieces
-        List<Move> lowDotMoves = new ArrayList<>();  // For 1-dot pieces
-        
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                CellState state = grid[row][col].getState();
-
-                // For first move of a color, can place on any empty cell
-                if (state == CellState.EMPTY && ((isRedTurn && !gameLogic.isRedHasMoved())
-                        || (!isRedTurn && !gameLogic.isBlueHasMoved()))) {
-                    moves.add(new Move(row, col));
-                }
-                // Otherwise, can only add to existing pieces of our color
-                else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
-                    // Check the dot count
-                    int dots = getDotCount(state);
-                    Move move = new Move(row, col);
+                
+                // Nếu tìm thấy quân đối thủ
+                if (opponentRow != -1) {
+                    // Ưu tiên các góc xa quân đối thủ
+                    int[][] corners = {{0, 0}, {0, GRID_SIZE-1}, {GRID_SIZE-1, 0}, {GRID_SIZE-1, GRID_SIZE-1}};
+                    for (int[] corner : corners) {
+                        CellState cornerState = isSimulation ? 
+                            convertCodeToState(simulationGrid[corner[0]][corner[1]]) : 
+                            gameLogic.getGrid()[corner[0]][corner[1]].getState();
+                            
+                        if (cornerState == CellState.EMPTY &&
+                            Math.abs(corner[0] - opponentRow) + Math.abs(corner[1] - opponentCol) >= 3) {
+                            strategicMoves.add(new Move(corner[0], corner[1]));
+                        }
+                    }
                     
-                    if (dots == 2) {
-                        highDotMoves.add(move);
-                    } else if (dots == 1) {
-                        lowDotMoves.add(move);
-                    } else if (dots == 3) {
-                        // Already handled in explosionMoves
+                    // Nếu không có góc phù hợp, tìm các vị trí cách xa đối thủ
+                    if (strategicMoves.isEmpty()) {
+                        for (int row = 0; row < GRID_SIZE; row++) {
+                            for (int col = 0; col < GRID_SIZE; col++) {
+                                CellState cellState = isSimulation ? 
+                                    convertCodeToState(simulationGrid[row][col]) : 
+                                    gameLogic.getGrid()[row][col].getState();
+                                    
+                                if (cellState == CellState.EMPTY) {
+                                    int distance = Math.abs(row - opponentRow) + Math.abs(col - opponentCol);
+                                    if (distance >= 3) { // Vị trí cách xa đối thủ
+                                        strategicMoves.add(new Move(row, col));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!strategicMoves.isEmpty()) {
+                        return strategicMoves;
                     }
                 }
             }
-        }
-        
-        // Add moves in priority order
-        moves.addAll(highDotMoves);
-        moves.addAll(lowDotMoves);
-        
-        // If no valid moves found, try any move
-        if (moves.isEmpty()) {
+            
+            // Nếu không có thông tin về đối thủ hoặc vẫn chưa tìm được vị trí chiến lược
+            // Ưu tiên vị trí trung tâm và các góc
+            CellState centerState = isSimulation ? 
+                convertCodeToState(simulationGrid[center][center]) : 
+                gameLogic.getGrid()[center][center].getState();
+                
+            if (centerState == CellState.EMPTY) {
+                strategicMoves.add(new Move(center, center));
+            }
+            
+            int[][] corners = {{0, 0}, {0, GRID_SIZE-1}, {GRID_SIZE-1, 0}, {GRID_SIZE-1, GRID_SIZE-1}};
+            for (int[] corner : corners) {
+                CellState cornerState = isSimulation ? 
+                    convertCodeToState(simulationGrid[corner[0]][corner[1]]) : 
+                    gameLogic.getGrid()[corner[0]][corner[1]].getState();
+                    
+                if (cornerState == CellState.EMPTY) {
+                    strategicMoves.add(new Move(corner[0], corner[1]));
+                }
+            }
+            
+            if (!strategicMoves.isEmpty()) {
+                return strategicMoves;
+            }
+            
+            // Nếu không có vị trí chiến lược, thêm tất cả các ô trống
             for (int row = 0; row < GRID_SIZE; row++) {
                 for (int col = 0; col < GRID_SIZE; col++) {
-                    CellState state = grid[row][col].getState();
-                    if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
+                    CellState cellState = isSimulation ? 
+                        convertCodeToState(simulationGrid[row][col]) : 
+                        gameLogic.getGrid()[row][col].getState();
+                        
+                    if (cellState == CellState.EMPTY) {
                         moves.add(new Move(row, col));
                     }
                 }
             }
+            
+            return moves;
         }
-
-        return moves;
+        
+        // 3. Xử lý các nước đi tiếp theo - cho cả quân 1 điểm và 2 điểm
+        List<Move> highDotMoves = new ArrayList<>();   // Ưu tiên quân 2 điểm
+        List<Move> lowDotMoves = new ArrayList<>();    // Sau đó đến quân 1 điểm
+        
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state;
+                
+                if (isSimulation) {
+                    state = convertCodeToState(simulationGrid[row][col]);
+                } else {
+                    state = gameLogic.getGrid()[row][col].getState();
+                }
+                
+                if ((isCurrentRedTurn && state.isRed()) || (!isCurrentRedTurn && state.isBlue())) {
+                    int dots = getDotCount(state);
+                    if (dots == 2) {
+                        highDotMoves.add(new Move(row, col));
+                    } else if (dots == 1) {
+                        lowDotMoves.add(new Move(row, col));
+                    }
+                    // Quân 3 điểm đã được xử lý ở trên
+                }
+            }
+        }
+        
+        // Thêm theo thứ tự ưu tiên
+        moves.addAll(highDotMoves);
+        moves.addAll(lowDotMoves);
+        
+        return moves.isEmpty() ? Collections.emptyList() : moves;
     }
-
 }

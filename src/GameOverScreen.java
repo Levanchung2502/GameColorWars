@@ -45,22 +45,17 @@ public class GameOverScreen extends JPanel {
         titlePanel.setBorder(new EmptyBorder(20, 0, 0, 0));
 
         // Custom game over label with enhanced visuals
-        JLabel gameOverLabel = new EnhancedLabel("KẾT THÚC", SwingConstants.CENTER);
-        gameOverLabel.setFont(new Font("Arial", Font.BOLD, 52));
-        gameOverLabel.setForeground(textColor);
+        JLabel gameOverLabel = new EnhancedLabel("KẾT THÚC", new Font("Arial", Font.BOLD, 52), textColor, true, true);
         gameOverLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Custom winner label with enhanced visuals
-        JLabel winnerLabel = new EnhancedLabel(winner + " THẮNG !", SwingConstants.CENTER);
-        winnerLabel.setFont(new Font("Arial", Font.BOLD, 40));
-        // Set the winner's color
+        Color winnerColor = textColor;
         if (winner.equals("ĐỎ")) {
-            winnerLabel.setForeground(redTeamColor);
+            winnerColor = redTeamColor;
         } else if (winner.equals("XANH")) {
-            winnerLabel.setForeground(blueTeamColor);
-        } else {
-            winnerLabel.setForeground(textColor);
+            winnerColor = blueTeamColor;
         }
+        JLabel winnerLabel = new EnhancedLabel(winner + " THẮNG !", new Font("Arial", Font.BOLD, 40), winnerColor, true, true);
         winnerLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         titlePanel.add(gameOverLabel);
@@ -162,8 +157,23 @@ public class GameOverScreen extends JPanel {
     
     // Custom label class with text effects
     private class EnhancedLabel extends JLabel {
+        private boolean hasDropShadow;
+        private boolean hasShadowOutline;
+        
         public EnhancedLabel(String text, int alignment) {
             super(text, alignment);
+            this.hasDropShadow = true;
+            this.hasShadowOutline = false;
+        }
+        
+        public EnhancedLabel(String text, Font font, Color color, boolean hasDropShadow, boolean hasShadowOutline) {
+            super(text);
+            this.hasDropShadow = hasDropShadow;
+            this.hasShadowOutline = hasShadowOutline;
+            setFont(font);
+            setForeground(color);
+            setHorizontalAlignment(JLabel.CENTER);
+            setAlignmentX(Component.CENTER_ALIGNMENT);
         }
         
         @Override
@@ -180,10 +190,21 @@ public class GameOverScreen extends JPanel {
             int textY = (getHeight() - (int) textBounds.getHeight()) / 2 + fm.getAscent();
             
             // Draw text shadow
-            g2d.setColor(new Color(0, 0, 0, 60));
-            g2d.drawString(getText(), textX + 3, textY + 3);
+            if (hasDropShadow) {
+                g2d.setColor(new Color(0, 0, 0, 60));
+                g2d.drawString(getText(), textX + 3, textY + 3);
+            }
             
-            // Draw the actual text with a subtle outline
+            // Shadow outline effect
+            if (hasShadowOutline) {
+                g2d.setColor(new Color(0, 0, 0, 100));
+                g2d.drawString(getText(), textX + 1, textY + 1);
+                g2d.drawString(getText(), textX - 1, textY - 1);
+                g2d.drawString(getText(), textX + 1, textY - 1);
+                g2d.drawString(getText(), textX - 1, textY + 1);
+            }
+            
+            // Draw the actual text
             g2d.setColor(getForeground());
             g2d.drawString(getText(), textX, textY);
             

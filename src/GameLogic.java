@@ -315,6 +315,7 @@ public class GameLogic extends JPanel {
     }
 
     public void resetGame() {
+        parent.updateScoreDisplay(0,0);
         redHasMoved = false;
         blueHasMoved = false;
         isRedTurn = true;
@@ -338,37 +339,17 @@ public class GameLogic extends JPanel {
         return isRedTurn;
     }
 
-    public void setRedTurn(boolean redTurn) {
-        isRedTurn = redTurn;
-        updateCellHighlights();
-        repaint(); // Repaint to update background color
-    }
 
     public boolean isRedHasMoved() {
         return redHasMoved;
-    }
-
-    public void setRedHasMoved(boolean redHasMoved) {
-        this.redHasMoved = redHasMoved;
     }
 
     public boolean isBlueHasMoved() {
         return blueHasMoved;
     }
 
-    public void setBlueHasMoved(boolean blueHasMoved) {
-        this.blueHasMoved = blueHasMoved;
-    }
-
     public Cell[][] getGrid() {
         return grid;
-    }
-    public void setGrid(Cell[][] newGrid) {
-        for (int row = 0 ; row < GRID_SIZE; row++) {
-            for(int col = 0; col < GRID_SIZE; col++) {
-                grid[row][col].setState(newGrid[row][col].getState());
-            }
-        }
     }
 
     public boolean isGameOver() {
