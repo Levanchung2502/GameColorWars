@@ -133,18 +133,15 @@ public class GameLogic extends JPanel {
             }
         }
 
-        // Xử lý kích hoạt AI
-        if (!isRedTurn) {
-            if (redHasMoved && !isGameOver()) {
-                // Sử dụng SwingUtilities.invokeLater để tránh vấn đề với thread
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            parent.activateAI();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+        // Xử lý kích hoạt AI - AI now can be either red or blue player
+        if (redHasMoved || blueHasMoved) { // At least one move has been made
+            if (!isGameOver()) {
+                // Let the parent class decide when to activate AI based on who's turn it is
+                SwingUtilities.invokeLater(() -> {
+                    try {
+                        parent.activateAI();
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 });
             }

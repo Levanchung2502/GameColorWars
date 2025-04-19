@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.event.ActionListener;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.swing.*;
@@ -32,6 +33,8 @@ public class ViewColorWars extends JPanel {
     private JPanel mainPanel;
     private Color redBgColor = new Color(252, 112, 112);
     private Color blueBgColor = new Color(94, 224, 255);
+    private boolean isAIRed = false;
+    private Random random = new Random();
 
     static {
         // Tăng kích thước heap cho JVM
@@ -44,7 +47,10 @@ public class ViewColorWars extends JPanel {
         this.parentFrame = parent;
         setLayout(new BorderLayout());
 
-        // Khởi tạo thread pool riêng cho AI với cấu hình tối ưu
+        if (isPlayWithBot) {
+            isAIRed = random.nextBoolean();
+        }
+
         aiExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread thread = new Thread(r);
             thread.setPriority(Thread.MIN_PRIORITY);
@@ -157,23 +163,49 @@ public class ViewColorWars extends JPanel {
         
         // Khởi tạo AI nếu chơi với máy
         if (isPlayWithBot) {
-            aiPlayer = new AIPlayer(gameLogic, false);
+            aiPlayer = new AIPlayer(gameLogic, isAIRed);
+            
+
+            if (isAIRed) {
+                SwingUtilities.invokeLater(() -> {
+                    Timer initialMoveTimer = new Timer(1500, e -> {
+                        makeAIMove();
+                    });
+                    initialMoveTimer.setRepeats(false);
+                    initialMoveTimer.start();
+                });
+            }
         }
     }
 
     private void cleanup() {
-        stopExistingTimers();
-        if (aiExecutor != null) {
-            try {
-                aiExecutor.shutdownNow();
-                aiExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
         if (aiPlayer != null) {
             aiPlayer.deactivate();
         }
+        
+        // Stop all timers
+        stopExistingTimers();
+        
+        // Shutdown executor service properly
+        if (aiExecutor != null && !aiExecutor.isShutdown()) {
+            try {
+                // Set flag to prevent further AI actions
+                isAIThinking = false;
+                
+                // Initiate an orderly shutdown
+                aiExecutor.shutdown();
+                
+                // Wait a bit for tasks to complete
+                if (!aiExecutor.awaitTermination(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    // Force shutdown if tasks don't complete quickly
+                    aiExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                // Restore the interrupted status
+                Thread.currentThread().interrupt();
+            }
+        }
+
     }
 
     public void deactivateAI() {
@@ -187,7 +219,11 @@ public class ViewColorWars extends JPanel {
         if (aiPlayer != null) {
             isAIThinking = false;
             aiPlayer.deactivate();
-            if (!gameLogic.isRedTurn()) {
+            
+            // Check if it's AI's turn based on the color assignment
+            boolean isAITurn = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
+            
+            if (isAITurn) {
                 activateAIWithDelay();
             }
         }
@@ -199,7 +235,11 @@ public class ViewColorWars extends JPanel {
                 try {
                     // Tăng độ trễ lên 1 giây
                     Thread.sleep(1000);
-                    aiPlayer.activate();
+                    if (!Thread.currentThread().isInterrupted()) {
+                        aiPlayer.activate();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // Restore interrupt status
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -208,16 +248,28 @@ public class ViewColorWars extends JPanel {
     }
 
     public void activateAI() {
-        if (aiPlayer != null && !gameLogic.isRedTurn() && !isAIThinking) {
+        // Check if it's AI's turn based on color assignment
+        boolean isAITurn = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
+        
+        if (aiPlayer != null && isAITurn && !isAIThinking && !gameLogic.isGameOver()) {
             stopExistingTimers();
             isAIThinking = true;
             
             aiExecutor.submit(() -> {
                 try {
-                    if (!gameLogic.isRedTurn() && !gameLogic.isGameOver()) {
-                        // Thêm độ trễ 1 giây trước khi AI đánh
-                        Thread.sleep(1000);
-                        aiPlayer.activate();
+                    // Only make move if it's still AI's turn and game is not over
+                    if (((isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn())) && !gameLogic.isGameOver()) {
+                        try {
+                            // Thêm độ trễ 1 giây trước khi AI đánh
+                            Thread.sleep(1000);
+                            if (!Thread.currentThread().isInterrupted()) {
+                                aiPlayer.activate();
+                            }
+                        } catch (InterruptedException e) {
+                            // Just log and exit cleanly when interrupted
+                            Thread.currentThread().interrupt(); // Restore interrupt status
+                            return;
+                        }
                     }
                 } catch (OutOfMemoryError e) {
                     System.gc();
@@ -230,7 +282,8 @@ public class ViewColorWars extends JPanel {
             });
 
             watchdogTimer = new Timer(5000, e -> {
-                if (!gameLogic.isRedTurn() && !gameLogic.isGameOver() && !isAIThinking) {
+                boolean isAITurnNow = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
+                if (isAITurnNow && !gameLogic.isGameOver() && !isAIThinking) {
                     activateAIWithDelay();
                 }
             });
@@ -297,8 +350,26 @@ public class ViewColorWars extends JPanel {
 
     private void resetGame() {
         hideGameOver();
+        
+        // Optionally randomize starting player again for variety
+        if (aiPlayer != null) {
+            isAIRed = random.nextBoolean();
+            aiPlayer = new AIPlayer(gameLogic, isAIRed);
+        }
+        
         gameLogic.resetGame();
         repaint();
+        
+        // If AI goes first in the new game, activate it with a proper delay
+        if (aiPlayer != null && isAIRed) {
+            SwingUtilities.invokeLater(() -> {
+                Timer initialMoveTimer = new Timer(1500, e -> {
+                    makeAIMove();
+                });
+                initialMoveTimer.setRepeats(false);
+                initialMoveTimer.start();
+            });
+        }
     }
 
     // Update the background color when the game state changes
@@ -307,4 +378,20 @@ public class ViewColorWars extends JPanel {
             mainPanel.repaint();
         }
     }
+
+    // Direct method to make the AI play its turn - useful for first move
+    public void makeAIMove() {
+        if (aiPlayer != null && !gameLogic.isGameOver()) {
+            boolean isAITurn = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
+            
+            if (isAITurn) {
+                try {
+                    aiPlayer.activate();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 }
+

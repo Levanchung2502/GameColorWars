@@ -12,7 +12,6 @@ public class SoundManager {
     
     static {
         try {
-            // Load and cache sound files
             File scoreFile = new File(SCORE_SOUND);
             File explosionFile = new File(EXPLOSION_SOUND);
             
@@ -46,17 +45,14 @@ public class SoundManager {
     private static void playSound(String soundName) {
         try {
             if (soundStreams.containsKey(soundName)) {
-                // Create a fresh clip for each playback
                 Clip clip = AudioSystem.getClip();
-                
-                // Need to get a fresh stream each time
+
                 File soundFile = new File(soundName.equals("score") ? SCORE_SOUND : EXPLOSION_SOUND);
                 AudioInputStream inputStream = AudioSystem.getAudioInputStream(soundFile);
                 
                 clip.open(inputStream);
                 clip.start();
-                
-                // Auto-close the clip when it's done playing
+
                 clip.addLineListener(event -> {
                     if (event.getType() == LineEvent.Type.STOP) {
                         clip.close();

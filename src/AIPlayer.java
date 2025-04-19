@@ -37,10 +37,16 @@ public class AIPlayer {
         if (timer != null) {
             timer.stop();
         }
+
+        boolean isAITurn = (isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn());
+        
+        if (!isAITurn) {
+            return;
+        }
         
         timer = new Timer(100, e -> {
-                if ((isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn())) {
-                    makeMove();
+            if ((isRed && gameLogic.isRedTurn()) || (!isRed && !gameLogic.isRedTurn())) {
+                makeMove();
             }
         });
         timer.setRepeats(false);
@@ -53,6 +59,8 @@ public class AIPlayer {
         }
     }
 
+
+    //Tao nuoc di
     private void makeMove() {
         SwingWorker<Move, Void> worker = new SwingWorker<Move, Void>() {
             @Override
@@ -88,6 +96,7 @@ public class AIPlayer {
         worker.execute();
     }
 
+    // Tìm nước đi tốt nhất bằng thuật toán minimax với alpha-beta
     private Move findBestMove() {
         nodesExplored = 0;
         startTime = System.currentTimeMillis();
@@ -95,6 +104,17 @@ public class AIPlayer {
         List<Move> possibleMoves = getAllPossibleMoves();
         if (possibleMoves.isEmpty()) {
             return null;
+        }
+        
+        // First check if we have any moves that create explosions and prioritize them
+        for (Move move : possibleMoves) {
+            Cell cell = gameLogic.getGrid()[move.row][move.col];
+            CellState state = cell.getState();
+            
+            // If this is a 3-dot piece, prioritize it immediately for explosion
+            if ((isRed && state == CellState.RED_THREE) || (!isRed && state == CellState.BLUE_THREE)) {
+                return move;
+            }
         }
 
         Move bestMove = null;
@@ -471,8 +491,8 @@ public class AIPlayer {
         // Tính điểm tổng hợp với trọng số mới
         score = (myPieces - oppPieces) * 200 +                    // Trọng số cho số lượng quân
                 (myDots - oppDots) * 150 +                        // Trọng số cho tổng số điểm
-                (myThreeDots - oppThreeDots) * 300 +              // Trọng số cho quân 3 điểm
-                chainPotentialScore * 400 -                       // Tăng trọng số cho khả năng tạo chuỗi nổ
+                (myThreeDots) * 800 +                             // INCREASED weight for 3-dot pieces
+                chainPotentialScore * 600 -                       // INCREASED weight for chain potential
                 opponentChainThreat * 350 -                       // Trừ điểm cho mối đe dọa từ đối phương
                 opponentThreeDotThreat * 500;                     // Trừ điểm mạnh cho mối đe dọa từ quân 3 điểm đối phương
 
@@ -481,8 +501,8 @@ public class AIPlayer {
             score += 500;
         }
         
-        if (myThreeDots > oppThreeDots) {
-            score += 700;
+        if (myThreeDots > 0) {
+            score += 700; // INCREASED bonus for having 3-dot pieces
         }
 
         return score;
@@ -596,8 +616,28 @@ public class AIPlayer {
     // Phương thức để kiểm tra xem AI có đang hoạt động hay không
     private List<Move> getAllPossibleMoves() {
         List<Move> moves = new ArrayList<>();
+        List<Move> explosionMoves = new ArrayList<>(); // Special list for moves that cause explosions
         boolean isRedTurn = gameLogic.isRedTurn();
         Cell[][] grid = gameLogic.getGrid();
+
+        // First, check for any 3-dot pieces that can be clicked to create explosions (4-dot)
+        for (int row = 0; row < GRID_SIZE; row++) {
+            for (int col = 0; col < GRID_SIZE; col++) {
+                CellState state = grid[row][col].getState();
+                
+                // Find 3-dot pieces of our color
+                if ((isRedTurn && state == CellState.RED_THREE) || 
+                    (!isRedTurn && state == CellState.BLUE_THREE)) {
+                    Move explosionMove = new Move(row, col);
+                    explosionMoves.add(explosionMove);
+                }
+            }
+        }
+        
+        // If we found explosion moves, prioritize them highly
+        if (!explosionMoves.isEmpty()) {
+            return explosionMoves;
+        }
 
         // For first moves, consider all positions with slight preference for strategic positions
         if ((isRedTurn && !gameLogic.isRedHasMoved()) || (!isRedTurn && !gameLogic.isBlueHasMoved())) {
@@ -630,7 +670,10 @@ public class AIPlayer {
             return moves;
         }
 
-        // For subsequent moves
+        // For subsequent moves, prioritize pieces with higher dot counts
+        List<Move> highDotMoves = new ArrayList<>(); // For 2-dot pieces
+        List<Move> lowDotMoves = new ArrayList<>();  // For 1-dot pieces
+        
         for (int row = 0; row < GRID_SIZE; row++) {
             for (int col = 0; col < GRID_SIZE; col++) {
                 CellState state = grid[row][col].getState();
@@ -642,18 +685,33 @@ public class AIPlayer {
                 }
                 // Otherwise, can only add to existing pieces of our color
                 else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
-                    // Avoid creating early explosions only in the very early game
-                    boolean isVeryEarlyGame = countPieces() < 4;
-
-                    if (isVeryEarlyGame) {
-                        if ((isRedTurn && state == CellState.RED_THREE) ||
-                                (!isRedTurn && state == CellState.BLUE_THREE)) {
-                            // Only avoid early explosions in very early game
-                            continue;
-                        }
+                    // Check the dot count
+                    int dots = getDotCount(state);
+                    Move move = new Move(row, col);
+                    
+                    if (dots == 2) {
+                        highDotMoves.add(move);
+                    } else if (dots == 1) {
+                        lowDotMoves.add(move);
+                    } else if (dots == 3) {
+                        // Already handled in explosionMoves
                     }
-
-                    moves.add(new Move(row, col));
+                }
+            }
+        }
+        
+        // Add moves in priority order
+        moves.addAll(highDotMoves);
+        moves.addAll(lowDotMoves);
+        
+        // If no valid moves found, try any move
+        if (moves.isEmpty()) {
+            for (int row = 0; row < GRID_SIZE; row++) {
+                for (int col = 0; col < GRID_SIZE; col++) {
+                    CellState state = grid[row][col].getState();
+                    if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
+                        moves.add(new Move(row, col));
+                    }
                 }
             }
         }
