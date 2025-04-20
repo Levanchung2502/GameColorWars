@@ -33,7 +33,7 @@ public class ViewGuide extends JPanel {
                 """;
 
         JTextArea textArea = new JTextArea(instructions);
-        textArea.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+        textArea.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         textArea.setForeground(textColor);
         textArea.setBackground(backgroundColor);
         textArea.setEditable(false);
