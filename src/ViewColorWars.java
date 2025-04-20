@@ -182,11 +182,9 @@ public class ViewColorWars extends JPanel {
         if (aiPlayer != null) {
             aiPlayer.deactivate();
         }
-        
-        // Stop all timers
+
         stopExistingTimers();
-        
-        // Shutdown executor service properly
+
         if (aiExecutor != null && !aiExecutor.isShutdown()) {
             try {
                 // Set flag to prevent further AI actions
@@ -195,7 +193,7 @@ public class ViewColorWars extends JPanel {
                 // Initiate an orderly shutdown
                 aiExecutor.shutdown();
                 
-                // Wait a bit for tasks to complete
+
                 if (!aiExecutor.awaitTermination(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
                     // Force shutdown if tasks don't complete quickly
                     aiExecutor.shutdownNow();
@@ -248,48 +246,46 @@ public class ViewColorWars extends JPanel {
     }
 
     public void activateAI() {
-        // Check if it's AI's turn based on color assignment
-        boolean isAITurn = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
-        
-        if (aiPlayer != null && isAITurn && !isAIThinking && !gameLogic.isGameOver()) {
-            stopExistingTimers();
-            isAIThinking = true;
-            
-            aiExecutor.submit(() -> {
-                try {
-                    // Only make move if it's still AI's turn and game is not over
-                    if (((isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn())) && !gameLogic.isGameOver()) {
-                        try {
-                            // Thêm độ trễ 1 giây trước khi AI đánh
-                            Thread.sleep(1000);
-                            if (!Thread.currentThread().isInterrupted()) {
-                                aiPlayer.activate();
-                            }
-                        } catch (InterruptedException e) {
-                            // Just log and exit cleanly when interrupted
-                            Thread.currentThread().interrupt(); // Restore interrupt status
-                            return;
-                        }
-                    }
-                } catch (OutOfMemoryError e) {
-                    System.gc();
-                    reinitializeAI();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                } finally {
-                    isAIThinking = false;
-                }
-            });
-
-            watchdogTimer = new Timer(5000, e -> {
-                boolean isAITurnNow = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
-                if (isAITurnNow && !gameLogic.isGameOver() && !isAIThinking) {
-                    activateAIWithDelay();
-                }
-            });
-            watchdogTimer.setRepeats(false);
-            watchdogTimer.start();
+        if (gameOverScreen.isVisible() || aiPlayer == null || isAIThinking) {
+            return;
         }
+
+        boolean isAITurn = (isAIRed && gameLogic.isRedTurn()) || (!isAIRed && !gameLogic.isRedTurn());
+        if (!isAITurn) {
+            return;
+        }
+
+        // Dừng các timer hiện có
+        stopExistingTimers();
+
+        // Thêm thời gian trì hoãn để tạo cảm giác tự nhiên hơn
+        activationTimer = new Timer(800, e -> {
+            if (!gameOverScreen.isVisible()) {
+                isAIThinking = true;
+                
+                // Sử dụng executor để tránh block UI thread
+                aiExecutor.submit(() -> {
+                    try {
+                        makeAIMove();
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    } finally {
+                        isAIThinking = false;
+                    }
+                });
+            }
+        });
+        activationTimer.setRepeats(false);
+        activationTimer.start();
+
+        // Watchdog timer để đảm bảo AI không chạy quá lâu
+        watchdogTimer = new Timer(10000, e -> {
+            if (isAIThinking) {
+                isAIThinking = false;
+            }
+        });
+        watchdogTimer.setRepeats(false);
+        watchdogTimer.start();
     }
 
     private void stopExistingTimers() {
@@ -360,7 +356,7 @@ public class ViewColorWars extends JPanel {
         gameLogic.resetGame();
         repaint();
         
-        // If AI goes first in the new game, activate it with a proper delay
+
         if (aiPlayer != null && isAIRed) {
             SwingUtilities.invokeLater(() -> {
                 Timer initialMoveTimer = new Timer(1500, e -> {
@@ -372,7 +368,6 @@ public class ViewColorWars extends JPanel {
         }
     }
 
-    // Update the background color when the game state changes
     public void updateBackgroundColor() {
         if (mainPanel != null) {
             mainPanel.repaint();
@@ -386,7 +381,15 @@ public class ViewColorWars extends JPanel {
             
             if (isAITurn) {
                 try {
+                    // Thêm độ trễ 1 giây trước khi AI đánh
+                    Thread.sleep(800);
                     aiPlayer.activate();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt(); // Restore interrupt status
+                    return;
+                } catch (OutOfMemoryError e) {
+                    System.gc();
+                    reinitializeAI();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

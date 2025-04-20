@@ -92,19 +92,24 @@ public class GameLogic extends JPanel {
         } else if ((isRedTurn && state.isRed()) || (!isRedTurn && state.isBlue())) {
             CellState nextState = state.getNextState();
             cell.setState(nextState);
-            isRedTurn = !isRedTurn;
+            
             if (nextState == CellState.RED_FOUR || nextState == CellState.BLUE_FOUR) {
                 // Explosion sound will be handled in explodeCell method
                 explodeCell(row, col, nextState, () -> {
                     SwingUtilities.invokeLater(() -> {
+                        // Chỉ chuyển lượt sau khi nổ hoàn thành
+                        isRedTurn = !isRedTurn;
+                        updateTurnLabel();
                         updateScoreDisplay();
                         updateCellHighlights();
                         repaint(); // Repaint to update background color
+                        checkGameOver();
                     });
                 });
             } else {
                 // Play sound in a separate thread to avoid blocking UI
                 new Thread(() -> SoundManager.playScore()).start();
+                isRedTurn = !isRedTurn;
                 updateTurnLabel();
                 updateCellHighlights();
                 repaint(); // Repaint to update background color
@@ -226,7 +231,6 @@ public class GameLogic extends JPanel {
             }
 
             SwingUtilities.invokeLater(() -> {
-                updateTurnLabel();
                 checkGameOver();
                 onFinish.run();
             });
