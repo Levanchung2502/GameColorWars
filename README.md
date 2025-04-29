@@ -9,3 +9,4 @@ Link Intellij: https://download.jetbrains.com/idea/ideaIC-2025.1.exe
 Mở Intellij IDEA và chọn mở project đã tải về từ link github trên 
 
 Chạy file Main để có thể chơi trò chơi 
+
